@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+/* Prevent users from highlighting text (feels more like an app) */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  /* Prevent the "pull-to-refresh" gesture in browsers */
+  overscroll-behavior-y: contain; 
+  /* Remove the grey tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Allow text selection only in input fields */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}

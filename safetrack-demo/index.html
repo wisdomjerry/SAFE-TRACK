@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#3b82f6" />
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    
+    <link rel="icon" type="image/png" href="/LOGO.png" />
+
+    <meta 
+      name="viewport" 
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" 
+    />
+
+    <title>SAFE TRACK</title>
+
+    <style>
+      /* Prevent the 'white flash' on startup. 
+         Match this background color to your app's main theme.
+      */
+      html, body {
+        background-color: #f8fafc; /* Tailwind slate-50 */
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden; /* Prevents awkward 'rubber-band' scrolling on the main body */
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
