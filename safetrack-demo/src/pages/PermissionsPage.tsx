@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { ShieldCheck, Save,  Loader2 } from "lucide-react";
+import { ShieldCheck, Save, Loader2 } from "lucide-react";
 
 interface Role {
   id: string;
@@ -32,7 +32,7 @@ const PermissionsPage = () => {
     if (roles.length > 0 && !activeMobileRole) {
       setActiveMobileRole(roles[0].id);
     }
-  }, [roles]);
+  }, [activeMobileRole, roles]);
 
   const fetchPerms = async () => {
     try {
@@ -40,6 +40,7 @@ const PermissionsPage = () => {
       const res = await axios.get(API_BASE, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const safeData = res.data.data.map((r: any) => ({
         ...r,
         permissions: r.permissions || [],
@@ -92,14 +93,20 @@ const PermissionsPage = () => {
             <ShieldCheck className="text-blue-600" size={28} />
             Access Control
           </h1>
-          <p className="text-slate-500 text-sm">Define global access levels for system roles.</p>
+          <p className="text-slate-500 text-sm">
+            Define global access levels for system roles.
+          </p>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
           className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-blue-400 transition-all shadow-lg shadow-blue-500/20"
         >
-          {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+          {saving ? (
+            <Loader2 className="animate-spin" size={18} />
+          ) : (
+            <Save size={18} />
+          )}
           {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
@@ -132,7 +139,10 @@ const PermissionsPage = () => {
                   Feature / Permission
                 </th>
                 {roles.map((role) => (
-                  <th key={role.id} className="px-6 py-5 font-black text-slate-400 text-center uppercase text-[10px] tracking-[0.2em]">
+                  <th
+                    key={role.id}
+                    className="px-6 py-5 font-black text-slate-400 text-center uppercase text-[10px] tracking-[0.2em]"
+                  >
                     {role.role.replace("_", " ")}
                   </th>
                 ))}
@@ -140,7 +150,10 @@ const PermissionsPage = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {features.map((feature) => (
-                <tr key={feature} className="hover:bg-slate-50/50 transition-colors group">
+                <tr
+                  key={feature}
+                  className="hover:bg-slate-50/50 transition-colors group"
+                >
                   <td className="px-8 py-5 font-bold text-slate-700 text-sm sticky left-0 bg-white group-hover:bg-slate-50 z-10 border-r border-slate-100">
                     {feature}
                   </td>
@@ -165,23 +178,32 @@ const PermissionsPage = () => {
         {/* Mobile View (List) */}
         <div className="lg:hidden">
           {features.map((feature) => {
-            const activeRoleObj = roles.find(r => r.id === activeMobileRole);
+            const activeRoleObj = roles.find((r) => r.id === activeMobileRole);
             const isChecked = activeRoleObj?.permissions.includes(feature);
-            
+
             return (
-              <div 
-                key={feature} 
+              <div
+                key={feature}
                 className="flex items-center justify-between p-5 border-b border-slate-100 last:border-0"
-                onClick={() => activeMobileRole && togglePermission(activeMobileRole, feature)}
+                onClick={() =>
+                  activeMobileRole &&
+                  togglePermission(activeMobileRole, feature)
+                }
               >
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-bold text-slate-800">{feature}</span>
+                  <span className="text-sm font-bold text-slate-800">
+                    {feature}
+                  </span>
                   <span className="text-[10px] text-slate-400 uppercase tracking-tight">
                     Access for {activeRoleObj?.role.replace("_", " ")}
                   </span>
                 </div>
-                <div className={`w-12 h-6 rounded-full transition-all flex items-center px-1 ${isChecked ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                    <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-all ${isChecked ? 'translate-x-6' : 'translate-x-0'}`} />
+                <div
+                  className={`w-12 h-6 rounded-full transition-all flex items-center px-1 ${isChecked ? "bg-blue-600" : "bg-slate-200"}`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow-sm transition-all ${isChecked ? "translate-x-6" : "translate-x-0"}`}
+                  />
                 </div>
               </div>
             );
