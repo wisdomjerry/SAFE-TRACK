@@ -58,8 +58,8 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/security" element={<Security />} />
         <Route path="/features" element={<FeaturesPage />} />
-        <Route path="accountsettings" element={<AccountSettingsPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route path="/accountsettings" element={<AccountSettingsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
 
         {/* SCHOOL ADMIN ROUTES */}
         <Route
