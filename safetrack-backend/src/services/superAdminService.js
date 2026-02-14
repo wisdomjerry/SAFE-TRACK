@@ -18,6 +18,15 @@ const superAdminService = {
           .select("id, name, status, created_at"),
       ]);
 
+      // --- ADD THESE LOGS HERE ---
+console.log("--- DEBUG: DASHBOARD DATA ---");
+console.log("Students Count Error:", studentsCount.error);
+console.log("Schools Count Error:", schoolsCount.error);
+console.log("Vans Count Error:", activeVansCount.error);
+console.log("All Schools Data:", allSchools.data); 
+console.log("All Schools Error:", allSchools.error);
+console.log("-----------------------------");
+
     // 2. Format Recent Schools
     const formattedSchools =
       allSchools.data
