@@ -15,7 +15,7 @@ const superAdminService = {
         // Using 'students(count)' requires a defined Foreign Key in Supabase
         supabase
           .from("schools")
-          .select("id, name, status, created_at"),
+          .select("id, name, created_at"),
       ]);
 
       // --- ADD THESE LOGS HERE ---
