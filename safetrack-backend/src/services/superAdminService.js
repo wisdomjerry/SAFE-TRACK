@@ -18,14 +18,14 @@ const superAdminService = {
           .select("id, name,admin_email, status, created_at, students(count)"),
       ]);
 
-      // --- ADD THESE LOGS HERE ---
-console.log("--- DEBUG: DASHBOARD DATA ---");
-console.log("Students Count Error:", studentsCount.error);
-console.log("Schools Count Error:", schoolsCount.error);
-console.log("Vans Count Error:", activeVansCount.error);
-console.log("All Schools Data:", allSchools.data); 
-console.log("All Schools Error:", allSchools.error);
-console.log("-----------------------------");
+    // --- ADD THESE LOGS HERE ---
+    console.log("--- DEBUG: DASHBOARD DATA ---");
+    console.log("Students Count Error:", studentsCount.error);
+    console.log("Schools Count Error:", schoolsCount.error);
+    console.log("Vans Count Error:", activeVansCount.error);
+    console.log("All Schools Data:", allSchools.data);
+    console.log("All Schools Error:", allSchools.error);
+    console.log("-----------------------------");
 
     // 2. Format Recent Schools
     const formattedSchools =
@@ -35,7 +35,8 @@ console.log("-----------------------------");
         .map((school) => ({
           id: school.id,
           name: school.name, // Map back to 'name' for the Frontend
-          status: school.status,
+          admin_email: school.admin_email,
+          status: school.status ? school.status.replace(/'/g, "") : "Pending",
           student_count: school.students?.[0]?.count || 0,
           created_at: school.created_at,
         })) || [];
