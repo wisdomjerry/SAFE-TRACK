@@ -74,6 +74,7 @@ const Login = () => {
         setIsFirstTime(true);
         setOtpSent(true);
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.response?.data?.message || "User not found");
       toast.error("Account lookup failed"); // Feedback for mobile users
@@ -120,6 +121,7 @@ const Login = () => {
 
         navigate(routeMap[role] || "/");
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.response?.data?.message || "Invalid Credentials");
       toast.error("Check your PIN and try again");

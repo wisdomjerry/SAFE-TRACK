@@ -29,6 +29,9 @@ import AdminNotifications from "./components/AdminNotifications";
 import LandingPage from "./pages/LandingPage";
 import FeaturesPage from "./pages/FeaturesPage";
 import DashboardLayout, { ProtectedRoute } from "./components/DashboardLayout";
+import ProfilePage from "./pages/ProfilePage";
+
+import AccountSettingsPage from "./pages/AccountSettingsPage";
 
 const PageNotFound = () => (
   <div className="flex items-center justify-center h-screen text-gray-600">
@@ -55,6 +58,8 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/security" element={<Security />} />
         <Route path="/features" element={<FeaturesPage />} />
+        <Route path="accountsettings" element={<AccountSettingsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
 
         {/* SCHOOL ADMIN ROUTES */}
         <Route
