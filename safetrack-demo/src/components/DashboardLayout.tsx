@@ -109,11 +109,13 @@ const DashboardLayout = ({ role }: { role: UserRole }) => {
 
   const roleMenus: Record<UserRole, MenuItem[]> = {
     SUPER_ADMIN: [
-      { label: "Home", path: "/admin/dashboard", icon: LayoutDashboard },
-      { label: "Schools", path: "/admin/schools", icon: School },
-      { label: "Users", path: "/admin/users", icon: Users },
-      { label: "Settings", path: "/admin/settings", icon: Settings },
-    ],
+  { label: "Home", path: "/admin/dashboard", icon: LayoutDashboard },
+  { label: "Schools", path: "/admin/schools", icon: School },
+  { label: "Users", path: "/admin/users", icon: Users },
+  { label: "Reports", path: "/admin/reports", icon: FileText }, // Added back
+  { label: "Permissions", path: "/admin/permissions", icon: ShieldCheck }, // Added back
+  { label: "Settings", path: "/admin/settings", icon: Settings },
+],
     SCHOOL_ADMIN: [
       { label: "Home", path: "/school/dashboard", icon: LayoutDashboard },
       { label: "Students", path: "/school/students", icon: Users },
