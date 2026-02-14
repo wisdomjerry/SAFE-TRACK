@@ -16,6 +16,7 @@ import {
   ClipboardList,
   RefreshCw,
   ShieldCheck, 
+ FileText,    // Add this
   type LucideIcon,
 } from "lucide-react";
 
