@@ -133,7 +133,7 @@ const TopNav: React.FC<TopNavProps> = ({ role }) => {
 
               {/* Inside TopNav.tsx Dropdown */}
               <Link
-                to="/dashboard/profile"
+                to="/profile"
                 onClick={() => setShowProfileMenu(false)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
               >
@@ -144,7 +144,7 @@ const TopNav: React.FC<TopNavProps> = ({ role }) => {
               </Link>
 
               <Link
-                to="/dashboard/accountsettings"
+                to="/accountsettings"
                 onClick={() => setShowProfileMenu(false)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
               >
