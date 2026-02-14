@@ -25,7 +25,7 @@ const superAdminService = {
         .slice(0, 5)
         .map((school) => ({
           id: school.id,
-          name: school.schoolname, // Map back to 'name' for the Frontend
+          name: school.name, // Map back to 'name' for the Frontend
           status: school.status,
           student_count: school.students?.[0]?.count || 0,
           created_at: school.created_at,

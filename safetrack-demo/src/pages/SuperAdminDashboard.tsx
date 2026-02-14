@@ -22,20 +22,31 @@ const SuperAdminDashboard = () => {
 
   // 1. Fetch Master Data on Load
   useEffect(() => {
-    const loadMasterData = async () => {
-      try {
-        const response = await authService.getDashboardData("SUPER_ADMIN");
-        // Assuming backend returns: { stats: { totalStudents: X, ... }, schools: [...] }
-        setStats(response.data.stats);
-        setSchools(response.data.schools);
-      } catch (err) {
-        console.error("Failed to fetch Super Admin data", err);
-      } finally {
-        setLoading(false);
+  const loadMasterData = async () => {
+    try {
+      const response = await authService.getDashboardData("SUPER_ADMIN");
+      console.log("Full API Response:", response); // Look at your browser console (F12)
+      
+      // Look at your console log: the data is inside response.data.data
+      // We use the same logic that makes your Schools Page work
+      const actualData = response.data?.data || response.data;
+
+      if (actualData) {
+        // Set the stats (totalStudents, etc)
+        setStats(actualData.stats || null);
+        
+        // Set the schools array
+        // We ensure it's an array so .map() doesn't crash
+        setSchools(actualData.schools || []); 
       }
-    };
-    loadMasterData();
-  }, []);
+    } catch (err) {
+      console.error("Failed to fetch Super Admin data", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  loadMasterData();
+}, []);
 
   
 

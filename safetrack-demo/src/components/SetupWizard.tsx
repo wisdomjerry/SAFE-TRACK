@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
 import api from "../api/axios";
 import {
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 const SetupWizard = ({ onComplete }: { onComplete: () => void }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

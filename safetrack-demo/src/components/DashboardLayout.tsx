@@ -154,7 +154,7 @@ const DashboardLayout = ({ role }: { role: UserRole }) => {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
         <TopNav role={role} />
 
-        <main className="flex-1 overflow-y-auto p-0  lg:pb-8">
+        <main className="flex-1 overflow-y-auto">
           <div className=" mx-auto w-full">
             <Outlet />
           </div>
