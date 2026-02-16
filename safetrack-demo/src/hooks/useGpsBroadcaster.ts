@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef } from "react";
 import { supabase } from "../config/supabaseClient";
 
@@ -18,6 +19,7 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
         const data = await res.json();
         // Returns "Street Name, Area"
         return data.display_name.split(",").slice(0, 2).join(",");
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         return null;
       }
@@ -38,7 +40,7 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
         Math.abs(latitude - lastCoords.current.lat) > 0.0005 ||
         Math.abs(longitude - lastCoords.current.lng) > 0.0005;
 
-      let updateData: any = {
+      const updateData: any = {
         current_lat: latitude,
         current_lng: longitude,
         heading: heading || 0,

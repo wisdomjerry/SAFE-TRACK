@@ -74,6 +74,8 @@ async function getParentChildrenService(parent_id) {
         is_on_bus: van?.status === "on_route",
         driver_name: van?.driver_name || "Assigning...",
         driver_phone: van?.driver_phone || null,
+        // Safeguard: Ensure handover_token is present for the QR code
+        handover_token: student.handover_token || student.id
       };
     });
   } catch (error) {
@@ -82,6 +84,27 @@ async function getParentChildrenService(parent_id) {
       error.message,
     );
     throw error; // This allows your controller to catch it and send a proper 500
+  }
+}
+
+async function logHandoverEvent({ studentId, driverId, action, method, lat, lng }) {
+  try {
+    const { error } = await supabase
+      .from("pickup_logs")
+      .insert({
+        student_id: studentId,
+        driver_id: driverId,
+        action_type: action, // 'pickup' or 'dropoff'
+        verification_hash: method,
+        location_lat: lat,
+        location_lng: lng
+      });
+
+    if (error) throw error;
+    console.log(`✅ [Audit] ${action} logged for student ${studentId}`);
+  } catch (error) {
+    console.error("❌ [Audit Error] Failed to log event:", error.message);
+    // We don't throw here so the main process doesn't fail if logging fails
   }
 }
 
@@ -133,4 +156,5 @@ module.exports = {
   getParentChildrenService,
   getChildAttendanceHistory,
   updateStudentGuardianPin,
+  logHandoverEvent,
 };

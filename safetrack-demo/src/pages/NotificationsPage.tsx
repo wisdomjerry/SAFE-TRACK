@@ -1,39 +1,53 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Bell, Hash, Inbox, Sparkles, CheckCheck, Megaphone, AlertTriangle, Clock } from "lucide-react";
 import api from "../api/axios";
 
 const NotificationsPage = () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("Workspace");
   
   const audioPlayer = useRef(new Audio("https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"));
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [notifRes, userRes] = await Promise.all([
-          api.get("/api/auth/notifications"),
-          api.get("/api/auth/me")
-        ]);
+  // 1. Wrap fetching in useCallback to prevent re-creation
+  const fetchData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    try {
+      const [notifRes, userRes] = await Promise.all([
+        api.get("/api/auth/notifications"),
+        api.get("/api/auth/me")
+      ]);
 
-        const newNotifs = notifRes.data.data || [];
-        
-        if (newNotifs.length > notifications.length && !loading) {
+      const newNotifs = notifRes.data.data || [];
+      
+      // 2. Only play sound if new notifications arrive in the background
+      setNotifications(prev => {
+        if (isSilent && newNotifs.length > prev.length) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           audioPlayer.current.play().catch(_e => console.log("Audio play blocked"));
         }
+        return newNotifs;
+      });
 
-        setNotifications(newNotifs);
-        setSchoolName(userRes.data.data?.school_name || "My School");
-      } catch (err) {
-        console.error("Fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+      setSchoolName(userRes.data.data?.school_name || "My School");
+    } catch (err) {
+      console.error("Fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // No dependencies here
+
+  // 3. Effect handles initial mount and periodic polling
+  useEffect(() => {
+    fetchData(false); // Initial load with spinner
+
+    const interval = setInterval(() => {
+      fetchData(true); // Silent background refresh every 10s
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
   const markAllRead = async () => {
     try {
@@ -44,9 +58,10 @@ const NotificationsPage = () => {
     }
   };
 
+  // Rest of your JSX stays EXACTLY the same...
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-slate-50 min-h-100">
+      <div className="flex flex-col items-center justify-center h-full bg-slate-50 min-h-screen">
         <div className="relative">
           <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
           <Bell className="absolute inset-0 m-auto text-blue-600/20" size={16} />
@@ -58,7 +73,6 @@ const NotificationsPage = () => {
 
   return (
     <div className="flex flex-col h-full bg-white max-w-4xl mx-auto shadow-2xl shadow-slate-200/50 min-h-screen border-x border-slate-100">
-      {/* Dynamic Header */}
       <header className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-3">
           <div className="bg-slate-900 p-2 rounded-lg text-white">
@@ -81,7 +95,6 @@ const NotificationsPage = () => {
         )}
       </header>
 
-      {/* Message Feed */}
       <div className="flex-1 overflow-y-auto">
         {notifications.length > 0 ? (
           <div className="divide-y divide-slate-50">
@@ -90,12 +103,10 @@ const NotificationsPage = () => {
                 key={n.id} 
                 className={`relative flex gap-4 p-6 transition-all hover:bg-slate-50/50 ${!n.is_read ? "bg-blue-50/30" : ""}`}
               >
-                {/* Unread Indicator Bar */}
                 {!n.is_read && (
                   <div className="absolute left-0 top-2 bottom-2 w-1.5 bg-blue-600 rounded-r-full shadow-[2px_0_8px_rgba(37,99,235,0.3)]" />
                 )}
 
-                {/* Avatar / Icon Section */}
                 <div className="shrink-0">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black shadow-lg ${
                       n.type === "urgent" 
@@ -106,7 +117,6 @@ const NotificationsPage = () => {
                   </div>
                 </div>
 
-                {/* Content Section */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
@@ -138,7 +148,6 @@ const NotificationsPage = () => {
             ))}
           </div>
         ) : (
-          /* Empty State */
           <div className="h-full flex flex-col items-center justify-center text-center p-12 mt-20">
             <div className="relative mb-8">
               <div className="absolute -inset-4 bg-blue-50 rounded-full animate-ping opacity-20" />
@@ -155,7 +164,6 @@ const NotificationsPage = () => {
         )}
       </div>
 
-      {/* Footer Branding */}
       <div className="p-6 bg-slate-50/50 border-t border-slate-100 mt-auto">
         <div className="flex items-center justify-center gap-4 opacity-30 grayscale hover:grayscale-0 transition-all">
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Secure Protocol v2.4</span>

@@ -9,13 +9,22 @@ interface TopNavProps {
   role: UserRole;
 }
 
-const TopNav: React.FC<TopNavProps> = ({ role }) => {
+const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
   const { userData, loading } = useUser();
   const navigate = useNavigate();
 
   // State for toggles
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  const rolePathMap = {
+    SUPER_ADMIN: "admin",
+    SCHOOL_ADMIN: "school",
+    DRIVER: "driver",
+    PARENT: "parent",
+  };
+
+  const basePath = `/${rolePathMap[role]}`;
 
   const roleConfig = {
     SUPER_ADMIN: { title: "System Overview", userTitle: "Super Administrator" },
@@ -132,8 +141,9 @@ const TopNav: React.FC<TopNavProps> = ({ role }) => {
               </div>
 
               {/* Inside TopNav.tsx Dropdown */}
+
               <Link
-                to="/profile"
+                to={`${basePath}/profile`}
                 onClick={() => setShowProfileMenu(false)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
               >
@@ -144,7 +154,7 @@ const TopNav: React.FC<TopNavProps> = ({ role }) => {
               </Link>
 
               <Link
-                to="/accountsettings"
+                to={`${basePath}/accountsettings`}
                 onClick={() => setShowProfileMenu(false)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
               >

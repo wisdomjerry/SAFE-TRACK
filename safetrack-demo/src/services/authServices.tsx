@@ -18,6 +18,7 @@ const authService = {
   },
 
   // --- 2. INPUT PILLAR (Registration) ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async registerSchool(formData: any) {
     // Connects to your school registration endpoint
     const response = await axios.post("/api/school/register", formData);

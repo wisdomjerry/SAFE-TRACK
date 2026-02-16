@@ -15,8 +15,8 @@ import {
   Bell,
   ClipboardList,
   RefreshCw,
-  ShieldCheck, 
- FileText,    // Add this
+  ShieldCheck,
+  FileText, // Add this
   type LucideIcon,
 } from "lucide-react";
 
@@ -56,7 +56,7 @@ export const ProtectedRoute = ({
 
 const DashboardLayout = ({ role }: { role: UserRole }) => {
   const [activeChildId, setActiveChildId] = useState<string | null>(null);
-  const { userData, loading } = useUser(); 
+  const { userData, loading } = useUser();
   const token = localStorage.getItem("authToken");
 
   useEffect(() => {
@@ -110,13 +110,13 @@ const DashboardLayout = ({ role }: { role: UserRole }) => {
 
   const roleMenus: Record<UserRole, MenuItem[]> = {
     SUPER_ADMIN: [
-  { label: "Home", path: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Schools", path: "/admin/schools", icon: School },
-  { label: "Users", path: "/admin/users", icon: Users },
-  { label: "Reports", path: "/admin/reports", icon: FileText }, // Added back
-  { label: "Permissions", path: "/admin/permissions", icon: ShieldCheck }, // Added back
-  { label: "Settings", path: "/admin/settings", icon: Settings },
-],
+      { label: "Home", path: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Schools", path: "/admin/schools", icon: School },
+      { label: "Users", path: "/admin/users", icon: Users },
+      { label: "Reports", path: "/admin/reports", icon: FileText }, // Added back
+      { label: "Permissions", path: "/admin/permissions", icon: ShieldCheck }, // Added back
+      { label: "Settings", path: "/admin/settings", icon: Settings },
+    ],
     SCHOOL_ADMIN: [
       { label: "Home", path: "/school/dashboard", icon: LayoutDashboard },
       { label: "Students", path: "/school/students", icon: Users },
@@ -149,7 +149,8 @@ const DashboardLayout = ({ role }: { role: UserRole }) => {
   const currentMenu = roleMenus[role] || [];
 
   return (
-    <div className="flex h-screen w-full bg-[#0f172a] overflow-hidden text-slate-200">
+    <div className=" flex h-screen w-full  text-white">
+      {/* Sidebar - Desktop Only */}
       <div className="hidden lg:flex">
         <Sidebar role={role} menuItems={currentMenu} />
       </div>
@@ -157,8 +158,17 @@ const DashboardLayout = ({ role }: { role: UserRole }) => {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
         <TopNav role={role} />
 
-        <main className="flex-1 overflow-y-auto">
-          <div className=" mx-auto w-full">
+        {/* MAIN CONTENT: 
+        1. Removed 'rounded-t' and 'border' on mobile (only 'lg:' versions remain)
+        2. Removed 'mt-2' on mobile (only 'lg:mt-0')
+        3. bg-white/10 added to give it a slight glass feel without the 'trapped' box look
+    */}
+        <main className="flex-1 bg-white/10  backdrop-blur-sm  overflow-y-auto    ">
+          {/* INNER PADDING:
+          Reduced to p-4 on mobile to give content more room, 
+          pb-24 ensures the BottomNav doesn't cover content.
+      */}
+          <div className="   ">
             <Outlet />
           </div>
         </main>

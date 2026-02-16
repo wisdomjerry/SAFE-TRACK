@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LogOut, Database, ExternalLink } from "lucide-react";
 import { useUser } from "../hooks/useUser";
 import type { UserRole, MenuItem } from "./DashboardLayout";
@@ -57,13 +57,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role, menuItems }) => {
 
       {/* NAV AREA: SCROLLABLE */}
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto scrollbar-hide">
-        {menuItems.map((item) => (
-          <SidebarLink
-            key={item.label}
-            {...item}
-            active={location.pathname.startsWith(item.path)}
-          />
-        ))}
+        {menuItems.map((item) => {
+          const isActive =
+            location.pathname === item.path ||
+            location.pathname.startsWith(item.path + "/");
+
+          return <SidebarLink key={item.label} {...item} active={isActive} />;
+        })}
       </nav>
 
       {/* FOOTER */}
@@ -90,26 +90,36 @@ const Sidebar: React.FC<SidebarProps> = ({ role, menuItems }) => {
 
 // --- UPDATED HELPER COMPONENTS ---
 
-const SidebarLink = ({ icon: Icon, label, path, active, animate }: any) => (
-  <Link
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SidebarLink = ({ icon: Icon, label, path, animate }: any) => (
+  <NavLink
     to={path}
-    className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative ${
-      active
-        ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-        : "text-slate-400 hover:bg-white/5 hover:text-white"
-    }`}
+    className={({ isActive }) =>
+      `group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative ${
+        isActive
+          ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+          : "text-slate-400 hover:bg-white/5 hover:text-white"
+      }`
+    }
   >
-    {/* By capitalizing 'Icon', we can use it as a standard component tag */}
-    <Icon
-      size={18}
-      className={`${active ? "text-white" : "text-slate-500"} ${animate ? "animate-spin" : ""}`}
-    />
-    <span
-      className={`text-[13px] tracking-tight ${active ? "font-bold" : "font-medium"}`}
-    >
-      {label}
-    </span>
-  </Link>
+    {({ isActive }) => (
+      <>
+        <Icon
+          size={18}
+          className={`${isActive ? "text-white" : "text-slate-500"} ${
+            animate ? "animate-spin" : ""
+          }`}
+        />
+        <span
+          className={`text-[13px] tracking-tight ${
+            isActive ? "font-bold" : "font-medium"
+          }`}
+        >
+          {label}
+        </span>
+      </>
+    )}
+  </NavLink>
 );
 
 const SyncStatus = ({ sheetUrl }: { sheetUrl?: string }) => (

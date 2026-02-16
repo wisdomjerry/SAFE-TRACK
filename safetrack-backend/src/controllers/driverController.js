@@ -83,74 +83,66 @@ async function finishRoute(req, res) {
 // ------------------- VERIFY STUDENT HANDOVER -------------------
 async function verifyStudentHandover(req, res) {
   const { studentId } = req.params;
-  const { pin, method, action, lat, lng } = req.body;
+  const { pin, method, action, lat, lng, scannedToken } = req.body;
 
   console.log(`--- 🚀 START VERIFICATION: ${studentId} ---`);
-  console.log(`[Payload Received]: action=${action}, method=${method}, pinProvided=${pin}`);
 
   try {
-    // 1️⃣ Fetch student record
+    // 1️⃣ Fetch student record - MUST include handover_token
     const { data: student, error: fetchError } = await supabase
       .from("students")
-      .select("guardian_pin, assigned_van_id, name, status, is_on_bus")
+      .select("id, name, guardian_pin, handover_token, assigned_van_id, status")
       .eq("id", studentId)
       .single();
 
     if (fetchError || !student) {
-      console.error(`❌ Student ${studentId} not found`, fetchError);
       return res.status(404).json({ success: false, message: "Student not found" });
     }
 
-    console.log(`[Step 1 Success]: Found ${student.name}. Current Status: ${student.status}`);
-
-    // 2️⃣ Security: PIN check
-    const dbPin = String(student.guardian_pin).trim();
-    const inputPin = String(pin || "").trim();
-
-    if (!pin || dbPin !== inputPin) {
-      console.warn(`⚠️ PIN mismatch for ${student.name}`);
-      return res.status(401).json({ success: false, message: "Security mismatch. Access denied." });
+    // 2️⃣ SECURITY: QR Token Check
+    if (method === "QR_SCAN") {
+      if (student.handover_token !== scannedToken) {
+        console.warn(`🚨 SECURITY ALERT: Token mismatch for ${student.name}`);
+        return res.status(403).json({ success: false, message: "Invalid or expired QR Code" });
+      }
     }
 
-    // 3️⃣ Map frontend action to DB
+    // 3️⃣ SECURITY: PIN check
+    const dbPin = String(student.guardian_pin).trim();
+    const inputPin = String(pin || "").trim();
+    if (dbPin !== inputPin) {
+      return res.status(401).json({ success: false, message: "Incorrect Security PIN" });
+    }
+
+    // 4️⃣ Update student status
     const isPickup = action === "picked_up";
-    const dbStatus = isPickup ? "picked_up" : "dropped_off";
-
-    console.log(`[Step 3]: Mapping action "${action}" → status "${dbStatus}" (is_on_bus: ${isPickup})`);
-
-    // 4️⃣ Update student record
-    const { data: updateResult, error: updateError } = await supabase
+    const { error: updateError } = await supabase
       .from("students")
       .update({
-        status: dbStatus,
+        status: isPickup ? "picked_up" : "dropped_off",
         is_on_bus: isPickup,
         [isPickup ? "last_pickup_time" : "last_dropoff_time"]: new Date().toISOString(),
       })
-      .eq("id", studentId)
-      .select();
+      .eq("id", studentId);
 
     if (updateError) throw updateError;
-    console.log(`[Step 4 Success]: DB Updated`, updateResult[0]);
 
     // 5️⃣ Insert audit log
-    const { error: logError } = await supabase.from("pickup_logs").insert({
+    await supabase.from("pickup_logs").insert({
       student_id: studentId,
       driver_id: req.user.id,
       van_id: student.assigned_van_id,
-      verification_hash: `VERIFIED_${method}`,
+      school_id: student.school_id, // Added this since your table has it
+      verification_hash: method,
       latitude: lat || null,
       longitude: lng || null,
       action_type: isPickup ? "pickup" : "dropoff",
-      scanned_at: new Date().toISOString(),
+      scanned_at: new Date().toISOString()
     });
-
-    if (logError) console.warn(`[Log Warning]: Log failed`, logError);
 
     console.log(`--- ✨ VERIFICATION COMPLETE for ${student.name} ---`);
-    res.status(200).json({
-      success: true,
-      message: `${student.name} ${isPickup ? "boarding" : "drop-off"} verified.`,
-    });
+    res.status(200).json({ success: true, message: "Verification successful" });
+
   } catch (err) {
     console.error("💥 Verification Error:", err.message);
     res.status(500).json({ success: false, message: err.message });

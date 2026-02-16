@@ -1,98 +1,232 @@
-import { Mail, Shield, MapPin, Clock, Star, Award } from "lucide-react";
+import {
+  MapPin,
+  ChevronRight,
+  Mail,
+  Phone,
+  Calendar,
+  ShieldCheck,
+  Settings,
+  Bell,
+  Globe,
+  Lock,
+  Edit2,
+  Bus,
+  Users,
+  School,
+  Crown,
+} from "lucide-react";
 import { useUser } from "../hooks/useUser";
 
+type Role = "SUPER_ADMIN" | "SCHOOL_ADMIN" | "DRIVER" | "PARENT";
+
+interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  location?: string;
+  phone?: string;
+  school_name?: string;
+}
 
 const ProfilePage = () => {
-  const { userData } = useUser();
+  const { userData } = useUser() as {
+    userData: UserData | null;
+  };
+
+  const role = userData?.role;
+
+  /* ================= ROLE CONFIG ================= */
+
+  const roleConfig = {
+    SUPER_ADMIN: {
+      label: "Super Admin",
+      icon: Crown,
+      stats: [
+        { label: "Total Schools", value: "24" },
+        { label: "System Health", value: "99.9%" },
+      ],
+    },
+    SCHOOL_ADMIN: {
+      label: "School Admin",
+      icon: School,
+      stats: [
+        { label: "Students", value: "1,248" },
+        { label: "Active Drivers", value: "18" },
+      ],
+    },
+    DRIVER: {
+      label: "Driver",
+      icon: Bus,
+      stats: [
+        { label: "Trips Completed", value: "312" },
+        { label: "Safety Score", value: "98%" },
+      ],
+    },
+    PARENT: {
+      label: "Parent",
+      icon: Users,
+      stats: [
+        { label: "Children Linked", value: "2" },
+        { label: "Pickup Accuracy", value: "100%" },
+      ],
+    },
+  };
+
+  const currentRole = role ? roleConfig[role] : null;
+
+  /* ================= MENU ================= */
+
+  const menuItems = [
+    { label: "Account Settings", icon: Settings },
+    { label: "Notifications", icon: Bell },
+    { label: "Devices", icon: Globe },
+    { label: "Security", icon: Lock },
+  ];
 
   return (
-    <div className="max-w-4xl mx-auto pb-24 space-y-6">
-      {/* Hero Profile Card */}
-      <div className="bg-linear-to-br from-blue-600 to-blue-800 rounded-4xl p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
-        
-        <div className="relative flex flex-col md:flex-row items-center gap-6">
+    <div className="w-full min-h-full p-6 md:p-12 space-y-10 bg-slate-50">
+
+      {/* ================= HERO ================= */}
+
+      <div className="bg-white rounded-4xl shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-slate-100 p-10">
+
+        <div className="flex flex-col md:flex-row items-center gap-10">
+
+          {/* Avatar */}
           <div className="relative">
-            <img
-              src={`https://ui-avatars.com/api/?name=${userData?.name?.replace(" ", "+")}&background=fff&color=3b82f6&size=128&bold=true`}
-              className="w-28 h-28 rounded-3xl shadow-2xl border-4 border-white/20 object-cover"
-              alt="Profile"
-            />
-            <div className="absolute -bottom-2 -right-2 bg-emerald-500 p-1.5 rounded-xl border-4 border-blue-700">
-              <Shield size={16} className="text-white" />
+            <div className="w-32 h-32 rounded-full ring-4 ring-slate-100 overflow-hidden">
+              <img
+                src={`https://ui-avatars.com/api/?name=${userData?.name?.replace(
+                  " ",
+                  "+"
+                )}&background=0f172a&color=fff&size=256`}
+                className="w-full h-full object-cover"
+              />
             </div>
+            <div className="absolute bottom-2 right-2 w-6 h-6 bg-emerald-500 border-4 border-white rounded-full" />
           </div>
-          
-          <div className="text-center md:text-left">
-            <h1 className="text-3xl font-black tracking-tight">{userData?.name}</h1>
-            <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
-              <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                {userData?.role?.replace("_", " ")}
-              </span>
-              <span className="bg-emerald-500/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-emerald-300">
-                Active Session
-              </span>
+
+          {/* Info */}
+          <div className="flex-1 text-center md:text-left">
+
+            <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
+              {userData?.name}
+            </h1>
+
+            {currentRole && (
+              <p className="mt-2 text-sm font-medium text-slate-500">
+                {currentRole.label}
+              </p>
+            )}
+
+            <div className="mt-8 grid sm:grid-cols-2 gap-6 text-sm text-slate-600">
+
+              <div className="flex items-center gap-3">
+                <Mail size={16} className="text-slate-400" />
+                {userData?.email}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Phone size={16} className="text-slate-400" />
+                {userData?.phone || "+256 700 000 000"}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <MapPin size={16} className="text-slate-400" />
+                {userData?.location || "Kampala, Uganda"}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Calendar size={16} className="text-slate-400" />
+                Joined February 2026
+              </div>
             </div>
+
+            <div className="mt-10 flex gap-4 justify-center md:justify-start">
+              <button className="px-8 py-3 rounded-2xl bg-slate-900 text-white font-medium hover:bg-slate-800 transition">
+                Edit Profile
+              </button>
+
+              <button className="p-3 rounded-2xl bg-slate-100 hover:bg-slate-200 transition">
+                <Edit2 size={18} className="text-slate-600" />
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Trust Score", value: "98%", icon: Star, color: "text-amber-500" },
-          { label: "Login Streak", value: "12 Days", icon: Clock, color: "text-blue-500" },
-          { label: "Tasks Done", value: "142", icon: Award, color: "text-purple-500" },
-          { label: "Location", value: "Uganda", icon: MapPin, color: "text-rose-500" },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
-            <stat.icon className={`${stat.color} mb-2`} size={20} />
-            <span className="text-xl font-black text-slate-900">{stat.value}</span>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{stat.label}</span>
+      {/* ================= ROLE STATS ================= */}
+
+      {currentRole && (
+        <div className="bg-white rounded-4xl shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-slate-100 p-10">
+
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <h3 className="text-2xl font-semibold text-slate-900">
+                {currentRole.label} Overview
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Performance & system metrics
+              </p>
+            </div>
+
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
+              <ShieldCheck size={20} className="text-slate-600" />
+            </div>
           </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+
+            {currentRole.stats.map((stat, i) => (
+              <div
+                key={i}
+                className="relative rounded-3xl bg-slate-50 p-8 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="absolute top-0 left-8 right-8 h-0.75 rounded-full bg-linear-to-r from-slate-900 to-slate-400 opacity-70" />
+
+                <p className="text-xs uppercase tracking-wider text-slate-500 font-medium mb-4">
+                  {stat.label}
+                </p>
+
+                <p className="text-4xl font-bold text-slate-900">
+                  {stat.value}
+                </p>
+
+                <div className="mt-6 flex items-center gap-2 text-xs text-emerald-600 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Status
+                </div>
+              </div>
+            ))}
+
+          </div>
+        </div>
+      )}
+
+      {/* ================= SETTINGS MENU ================= */}
+
+      <div className="bg-white rounded-4xl shadow-[0_20px_60px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden">
+
+        {menuItems.map((item, idx) => (
+          <button
+            key={idx}
+            className="w-full flex items-center justify-between px-8 py-6 hover:bg-slate-50 transition border-b last:border-0"
+          >
+            <div className="flex items-center gap-4">
+              <item.icon size={20} className="text-slate-400" />
+              <span className="font-medium text-slate-700">
+                {item.label}
+              </span>
+            </div>
+
+            <ChevronRight size={18} className="text-slate-300" />
+          </button>
         ))}
+
       </div>
 
-      {/* Info Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-4xl border border-slate-100 shadow-sm">
-          <h3 className="font-black text-slate-900 mb-4 flex items-center gap-2">
-            <Mail size={18} className="text-blue-500" /> Account Details
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center py-2 border-b border-slate-50">
-              <span className="text-xs font-bold text-slate-400 uppercase">Email</span>
-              <span className="text-sm font-semibold text-slate-700">{userData?.email}</span>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-xs font-bold text-slate-400 uppercase">Joined</span>
-              <span className="text-sm font-semibold text-slate-700">Feb 2026</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-4xl border border-slate-100 shadow-sm">
-          <h3 className="font-black text-slate-900 mb-4 flex items-center gap-2">
-             Recent Activity
-          </h3>
-          <div className="space-y-4">
-            <div className="flex gap-3">
-              <div className="w-1 h-8 bg-blue-500 rounded-full" />
-              <div>
-                <p className="text-xs font-bold text-slate-800">Logged in from Mobile</p>
-                <p className="text-[10px] text-slate-400 uppercase font-medium">Moto G14 • 2 mins ago</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-1 h-8 bg-slate-200 rounded-full" />
-              <div>
-                <p className="text-xs font-bold text-slate-800">Updated Profile</p>
-                <p className="text-[10px] text-slate-400 uppercase font-medium">Desktop • 3 hours ago</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

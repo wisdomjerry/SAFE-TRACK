@@ -5,6 +5,7 @@ import { Toaster } from "react-hot-toast";
 import Login from "./pages/Login";
 import SchoolRegistration from "./pages/SchoolRegistration";
 import ResetPin from "./pages/ResetPin";
+import 'leaflet/dist/leaflet.css';
 
 // Dashboards
 import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
@@ -29,9 +30,8 @@ import AdminNotifications from "./components/AdminNotifications";
 import LandingPage from "./pages/LandingPage";
 import FeaturesPage from "./pages/FeaturesPage";
 import DashboardLayout, { ProtectedRoute } from "./components/DashboardLayout";
-import ProfilePage from "./pages/ProfilePage";
-
 import AccountSettingsPage from "./pages/AccountSettingsPage";
+import ProfilePage from "./pages/ProfilePage";
 
 const PageNotFound = () => (
   <div className="flex items-center justify-center h-screen text-gray-600">
@@ -48,18 +48,14 @@ export default function App() {
       <Toaster position="top-right" />
       <Routes>
         {/* PUBLIC ROUTES */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register-school" element={<SchoolRegistration />} />
         <Route path="/reset-pin" element={<ResetPin />} />
-        <Route path="/" element={<LandingPage />} />
-
-        <Route path="/login" element={<Login />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/security" element={<Security />} />
         <Route path="/features" element={<FeaturesPage />} />
-        <Route path="/accountsettings" element={<AccountSettingsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
 
         {/* SCHOOL ADMIN ROUTES */}
         <Route
@@ -70,17 +66,15 @@ export default function App() {
             />
           }
         >
-          <Route
-            path="/school"
-            element={<DashboardLayout role="SCHOOL_ADMIN" />}
-          >
+          <Route path="/school" element={<DashboardLayout role="SCHOOL_ADMIN" />}>
             <Route index element={<SchoolAdminDashboard />} />
-            <Route path="dashboard" element={<SchoolAdminDashboard />} />{" "}
-            {/* Alias for the sidebar link */}
+            <Route path="dashboard" element={<SchoolAdminDashboard />} />
             <Route path="students" element={<StudentsPage />} />
             <Route path="drivers" element={<DriversPage />} />
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="routes" element={<VansRoutesPage />} />
+            <Route path="accountsettings" element={<AccountSettingsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>
 
@@ -93,6 +87,9 @@ export default function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="permissions" element={<PermissionsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          {/* REMOVED LEADING SLASHES BELOW */}
+          <Route path="accountsettings" element={<AccountSettingsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
 
         {/* DRIVER ROUTES */}
@@ -101,6 +98,8 @@ export default function App() {
           <Route path="dashboard" element={<DriverDashboard />} />
           <Route path="students" element={<StudentChecklist />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="accountsettings" element={<AccountSettingsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
 
         {/* PARENT ROUTES */}
@@ -108,7 +107,8 @@ export default function App() {
           <Route index element={<ParentDashboard />} />
           <Route path="dashboard" element={<ParentDashboard />} />
           <Route path="history/:studentId" element={<ChildHistory />} />
-          {/* Add History, Payments here */}
+          <Route path="accountsettings" element={<AccountSettingsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
 
         {/* 404 ROUTE */}
