@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^8.0.0",
     "@capacitor/android": "^8.1.0",
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
@@ -19,6 +20,7 @@
     "@zxing/library": "^0.21.3",
     "axios": "^1.13.4",
     "canvas-confetti": "^1.9.4",
+    "capacitor-native-biometric": "^4.2.2",
     "google-map-react": "^2.2.5",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
@@ -48,6 +50,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "patch-package": "^8.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",

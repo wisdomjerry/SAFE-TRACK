@@ -436,6 +436,55 @@ const setPin = async (req, res) => {
   }
 };
 
+// 1. Update Password
+exports.updatePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const user = await User.findById(req.user.id).select('+password');
+
+        // Check if current password is correct
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Current password is incorrect' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        res.status(200).json({ message: 'Password updated successfully' });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// 2. Update Profile (Phone, Location, etc.)
+exports.updateProfile = async (req, res) => {
+    try {
+        const { phone, location, name } = req.body;
+        const user = await User.findByIdAndUpdate(
+            req.user.id,
+            { $set: { phone, location, name } },
+            { new: true }
+        );
+        res.status(200).json({ data: user });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to update profile' });
+    }
+};
+
+// 3. Toggle Biometric (Server-side flag)
+exports.toggleBiometric = async (req, res) => {
+    try {
+        const { enabled } = req.body;
+        await User.findByIdAndUpdate(req.user.id, { biometric_enabled: enabled });
+        res.status(200).json({ message: `Biometrics ${enabled ? 'enabled' : 'disabled'}` });
+    } catch (err) {
+        res.status(500).json({ message: 'Operation failed' });
+    }
+};
+
 module.exports = {
   unifiedLogin,
   getProfile,
@@ -446,4 +495,8 @@ module.exports = {
   startOtpLogin,
   verifyOtp,
   setPin,
+  updatePassword,
+  updateProfile,
+  toggleBiometric,
+  
 };

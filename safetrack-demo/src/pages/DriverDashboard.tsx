@@ -10,13 +10,16 @@ import {
   Sun,
   QrCode,
   Phone,
+  Camera,
+  Loader2,
 } from "lucide-react";
 import axios from "axios";
 import { useGpsBroadcaster } from "../hooks/useGpsBroadcaster";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { BrowserMultiFormatReader } from "@zxing/library";
+// Removed BrowserMultiFormatReader as we are using native MLKit
+import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
 const DriverDashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -32,9 +35,8 @@ const DriverDashboard = () => {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [pinInput, setPinInput] = useState("");
-  const [scannedToken, setScannedToken] = useState<string | null>(null); // Added to track secret QR data
+  const [scannedToken, setScannedToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const codeReader = useRef(new BrowserMultiFormatReader());
 
   useGpsBroadcaster(van?.id, tripActive);
 
@@ -59,6 +61,9 @@ const DriverDashboard = () => {
       if (response.data.success) {
         setVan(response.data.van);
         setStudents(response.data.students);
+
+        // Removed .catch() because state updates are synchronous
+        // and don't return a promise.
         setDriverInfo((prev: any) => ({
           ...prev,
           phone_number: response.data.van?.driver_phone || prev.phone_number,
@@ -82,34 +87,48 @@ const DriverDashboard = () => {
     return () => clearInterval(interval);
   }, [tripActive, fetchDashboardData]);
 
-  // UPDATED: QR Scanner Logic to use handover_token
-  useEffect(() => {
-    if (isScanning) {
-      codeReader.current.decodeFromVideoDevice(
-        null,
-        "video-canvas",
-        (result: { getText: () => any }, _err: any) => {
-          if (result) {
-            const rawValue = result.getText();
-            // SECURITY: Find student by the secret handover_token, not student.id
-            const student = students.find((s) => s.handover_token === rawValue);
+  // NEW: Native Barcode Scanner Logic
+  const startNativeScan = async () => {
+    try {
+      const status = await BarcodeScanner.checkPermissions();
+      if (status.camera !== "granted") {
+        await BarcodeScanner.requestPermissions();
+      }
 
-            if (student) {
-              setScannedToken(rawValue); // Store the secret for the backend call
-              setSelectedStudent(student);
-              setIsScanning(false);
-              setShowVerifyModal(true);
-              codeReader.current.reset();
-            } else {
-              // Optional: Handle invalid scan here
-            }
-          }
-        },
-      );
+      // Prepare UI
+      document.body.classList.add("barcode-scanner-active");
+      setIsScanning(true);
+
+      // CHANGE: Use .scan() instead of .startScan()
+      const result = await BarcodeScanner.scan();
+
+      // Now 'result.barcodes' will be recognized by TypeScript
+      if (result.barcodes && result.barcodes.length > 0) {
+        const rawValue = result.barcodes[0].displayValue;
+        const student = students.find((s) => s.handover_token === rawValue);
+
+        if (student) {
+          setScannedToken(rawValue);
+          setSelectedStudent(student);
+          setShowVerifyModal(true);
+        } else {
+          alert("Invalid Student ID Scanned");
+        }
+      }
+
+      // Cleanup UI after scan is finished
+      await stopNativeScan();
+    } catch (error) {
+      console.error("Scanner error:", error);
+      await stopNativeScan();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => codeReader.current.reset();
-  }, [isScanning, students]);
+  };
+
+  const stopNativeScan = async () => {
+    document.body.classList.remove("barcode-scanner-active");
+    await BarcodeScanner.stopScan();
+    setIsScanning(false);
+  };
 
   const toggleTrip = async () => {
     const newState = !tripActive;
@@ -128,16 +147,18 @@ const DriverDashboard = () => {
 
   const handleVerify = (student: any) => {
     setSelectedStudent(student);
-    setScannedToken(null); // Manual entry means no scanned token
+    setScannedToken(null);
     setPinInput("");
     setShowVerifyModal(true);
   };
 
   const submitVerification = async () => {
-    if (!pinInput || pinInput.length < 4) return;
+    // UPDATED: Now requires 6 digits
+    if (!pinInput || pinInput.length < 6) return;
     setIsVerifying(true);
 
-    const action = selectedStudent.status === "picked_up" ? "dropped_off" : "picked_up";
+    const action =
+      selectedStudent.status === "picked_up" ? "dropped_off" : "picked_up";
 
     try {
       const token = localStorage.getItem("authToken");
@@ -154,48 +175,32 @@ const DriverDashboard = () => {
         { headers: { Authorization: `Bearer ${token?.replace(/"/g, "")}` } },
       );
 
-      // --- NEW: SUCCESS FEEDBACK ---
-
-      // 1. Physical Haptic Feedback (Vibrate for 200ms)
       if ("vibrate" in navigator) {
         navigator.vibrate(200);
       }
 
-      // 2. Audio Context (Mobile-Safe Beep)
-      const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass =
+        (window as any).AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
         const audioCtx = new AudioContextClass();
-        
-        // Resume context for mobile browsers that start in 'suspended' state
-        if (audioCtx.state === 'suspended') {
-          await audioCtx.resume();
-        }
-
+        if (audioCtx.state === "suspended") await audioCtx.resume();
         const oscillator = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
-        
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-        
         oscillator.type = "sine";
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Success Tone
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
         gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        
         oscillator.start();
         oscillator.stop(audioCtx.currentTime + 0.2);
       }
 
-      // --- STATE UPDATES ---
       setScannedToken(null);
       setShowVerifyModal(false);
-      setPinInput(""); // Clear PIN for next use
+      setPinInput("");
       fetchDashboardData();
-
     } catch (err: any) {
-      // Error Feedback: Double short vibration
-      if ("vibrate" in navigator) {
-        navigator.vibrate([100, 50, 100]);
-      }
+      if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
       alert(err.response?.data?.message || "Verification failed");
     } finally {
       setIsVerifying(false);
@@ -268,6 +273,7 @@ const DriverDashboard = () => {
       </header>
 
       <div className="px-5 space-y-6">
+        {/* Driver Card Section */}
         <section
           className={`${theme.card} rounded-4xl p-6 border ${theme.border} shadow-xl`}
         >
@@ -329,6 +335,7 @@ const DriverDashboard = () => {
           </div>
         </section>
 
+        {/* Map Section */}
         <section
           className={`${theme.card} rounded-[2.5rem] p-2 border ${theme.border} overflow-hidden shadow-lg`}
         >
@@ -365,19 +372,10 @@ const DriverDashboard = () => {
                 </p>
               </div>
             )}
-            <div className="absolute top-4 left-4 right-4 z-10 pointer-events-none">
-              <div className="bg-black/70 backdrop-blur-lg p-3 rounded-2xl border border-white/10 max-w-[85%] shadow-2xl">
-                <p className="text-[8px] font-black text-blue-400 uppercase tracking-tighter mb-0.5">
-                  Live GPS Stream
-                </p>
-                <p className="text-xs font-bold text-white truncate lowercase">
-                  {van?.current_location_name || "Syncing..."}
-                </p>
-              </div>
-            </div>
           </div>
         </section>
 
+        {/* Stats Section */}
         <section
           className={`${theme.card} rounded-4xl p-6 border ${theme.border}`}
         >
@@ -431,11 +429,12 @@ const DriverDashboard = () => {
           </div>
         </section>
 
+        {/* Roster Section */}
         <section className="space-y-4">
           <div className="flex justify-between items-center px-2">
             <h3 className="font-black text-lg">Student Roster</h3>
             <button
-              onClick={() => setIsScanning(true)}
+              onClick={startNativeScan}
               className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg"
             >
               <QrCode size={20} />
@@ -466,9 +465,11 @@ const DriverDashboard = () => {
         </section>
       </div>
 
-      {/* NEW: MOBILE SCANNER & PIN MODAL */}
+      {/* NEW: MOBILE SCANNER & PIN MODAL (UPDATED FOR NATIVE & 6 DIGITS) */}
       {(showVerifyModal || isScanning) && (
-        <div className="fixed inset-0 z-9999 flex items-end bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div
+          className={`fixed inset-0 z-9999 flex items-end ${isScanning ? "bg-transparent" : "bg-black/80"} backdrop-blur-md animate-in fade-in duration-200`}
+        >
           <div
             className={`${theme.card} w-full rounded-t-[3rem] p-6 pb-12 shadow-2xl border-t ${theme.border}`}
           >
@@ -477,26 +478,29 @@ const DriverDashboard = () => {
             {isScanning ? (
               <div className="space-y-6">
                 <div className="text-center">
-                  <h3 className="text-xl font-black">Scanning...</h3>
+                  <h3 className="text-xl font-black">Scanning Student ID...</h3>
                   <p className="text-xs text-slate-500">
-                    Point camera at Student ID
+                    Point camera at QR code
                   </p>
                 </div>
-                <div className="relative aspect-square w-full max-w-70 mx-auto overflow-hidden rounded-4xl border-4 border-blue-600 bg-black">
-                  <video
-                    id="video-canvas"
-                    className="h-full w-full object-cover"
+
+                {/* Visual Camera Box (Transparent for Native Camera) */}
+                <div className="relative aspect-square w-full max-w-70 mx-auto overflow-hidden rounded-4xl border-4 border-blue-600 bg-transparent flex items-center justify-center">
+                  <Camera
+                    size={48}
+                    className="text-blue-600/20 animate-pulse"
                   />
                   <div
-                    className="absolute inset-x-0 top-0 h-1 bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)] animate-pulse"
+                    className="absolute inset-x-0 top-0 h-1 bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]"
                     style={{ animation: "scan 2s linear infinite" }}
                   />
                 </div>
+
                 <button
-                  onClick={() => setIsScanning(false)}
+                  onClick={stopNativeScan}
                   className="w-full py-4 bg-slate-800 rounded-2xl font-black text-slate-300"
                 >
-                  Cancel
+                  Cancel Scan
                 </button>
               </div>
             ) : (
@@ -513,32 +517,47 @@ const DriverDashboard = () => {
                   <button
                     onClick={() => {
                       setShowVerifyModal(false);
-                      setIsScanning(true);
+                      startNativeScan();
                     }}
                     className="p-4 bg-blue-600/10 rounded-2xl text-blue-500"
                   >
                     <QrCode size={24} />
                   </button>
                 </div>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={4}
-                  value={pinInput}
-                  onChange={(e) =>
-                    setPinInput(e.target.value.replace(/\D/g, ""))
-                  }
-                  placeholder="PIN"
-                  className="w-full text-center text-5xl tracking-[0.5em] font-black py-6 rounded-4xl bg-white/5 border-2 border-white/10 focus:border-blue-500 outline-none"
-                />
+
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6} // PIN length is now 6
+                    value={pinInput}
+                    onChange={(e) =>
+                      setPinInput(e.target.value.replace(/\D/g, ""))
+                    }
+                    placeholder="••••••"
+                    className="w-full text-center text-5xl tracking-[0.2em] font-black py-6 rounded-4xl bg-white/5 border-2 border-white/10 focus:border-blue-500 outline-none"
+                  />
+                  <p className="text-center text-[10px] text-slate-500 font-bold uppercase">
+                    Enter 6-digit Security PIN
+                  </p>
+                </div>
+
                 <button
                   onClick={submitVerification}
-                  disabled={pinInput.length < 4 || isVerifying}
-                  className={`w-full py-5 rounded-4xl font-black text-lg transition-all ${pinInput.length === 4 ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30" : "bg-slate-800 text-slate-600"}`}
+                  disabled={pinInput.length < 6 || isVerifying} // Required length is now 6
+                  className={`w-full py-5 rounded-4xl font-black text-lg transition-all ${pinInput.length === 6 ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30" : "bg-slate-800 text-slate-600"}`}
                 >
-                  {isVerifying ? "Verifying..." : "Confirm Verification"}
+                  {isVerifying ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="animate-spin" size={20} />{" "}
+                      Verifying...
+                    </span>
+                  ) : (
+                    "Confirm Verification"
+                  )}
                 </button>
+
                 <button
                   onClick={() => setShowVerifyModal(false)}
                   className="w-full text-slate-500 font-bold text-sm"
@@ -554,6 +573,7 @@ const DriverDashboard = () => {
   );
 };
 
+// ... Sub-components (StudentItem, StatBlock) remain as you provided them
 const StudentItem = ({
   name,
   phone,

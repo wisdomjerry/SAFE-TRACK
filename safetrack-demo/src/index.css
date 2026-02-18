@@ -69,3 +69,13 @@ input, textarea {
   50% { opacity: 1; }
   100% { top: 100%; opacity: 0; }
 }
+
+/* This class will be toggled when scanning starts */
+body.barcode-scanner-active {
+  visibility: hidden;
+}
+
+/* Ensure the modal content stays visible while the rest of the app hides */
+body.barcode-scanner-active .scanner-ui-overlay {
+  visibility: visible;
+}

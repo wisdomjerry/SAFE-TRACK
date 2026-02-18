@@ -1,0 +1,21 @@
+diff --git a/node_modules/capacitor-native-biometric/android/build.gradle b/node_modules/capacitor-native-biometric/android/build.gradle
+index ab45e43..138269d 100644
+--- a/node_modules/capacitor-native-biometric/android/build.gradle
++++ b/node_modules/capacitor-native-biometric/android/build.gradle
+@@ -7,7 +7,7 @@ ext {
+ buildscript {
+     repositories {
+         google()
+-        jcenter()
++        mavenCentral()
+     }
+     dependencies {
+         classpath 'com.android.tools.build:gradle:3.6.1'
+@@ -39,7 +39,6 @@ android {
+ 
+ repositories {
+     google()
+-    jcenter()
+     mavenCentral()
+ }
+ 
