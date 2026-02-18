@@ -7,7 +7,6 @@ import {
   MapPin,
   Phone,
   CheckCircle2,
-  Clock,
   ShieldCheck,
   ChevronRight,
   Sun,
@@ -23,7 +22,7 @@ interface Child {
   school_name: string;
   van_id: string;
   guardian_pin: string;
-  handover_token: string; // NEW: Added handover_token
+  handover_token: string;
   is_on_bus: boolean;
   status: string;
   lat: number;
@@ -35,15 +34,22 @@ interface Child {
   driver_phone?: string;
 }
 
+interface LogEntry {
+  id: string;
+  action_type: "pickup" | "dropoff";
+  scanned_at: string;
+  van_id: string;
+}
+
 const ParentDashboard = () => {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [guardianPin, setGuardianPin] = useState("");
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
-  const [isDarkMode, setIsDarkMode] = useState(false); // Dark Mode State
+  const [logs, setLogs] = useState<LogEntry[]>([]); // NEW: State for logs
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const prevIsOnBusRef = useRef<boolean>(false);
 
-  // Theme Logic
   const theme = {
     bg: isDarkMode ? 'bg-[#0F0F10]' : 'bg-[#F4F7FA]',
     card: isDarkMode ? 'bg-[#1C1C1E]' : 'bg-white',
@@ -64,6 +70,7 @@ const ParentDashboard = () => {
         setGuardianPin(activeChild.guardian_pin || "");
         prevIsOnBusRef.current = activeChild.is_on_bus;
 
+        // Fetch Route History
         const { data: history } = await supabase
           .from("van_location_history")
           .select("lat, lng")
@@ -74,6 +81,16 @@ const ParentDashboard = () => {
         if (history && history.length > 0) {
           setRoutePath(history.map((h) => [h.lat, h.lng]));
         }
+
+        // --- NEW: FETCH PICKUP LOGS ---
+        const { data: logsData } = await supabase
+          .from("pickup_logs")
+          .select("id, action_type, scanned_at, van_id")
+          .eq("student_id", activeChild.id)
+          .order("scanned_at", { ascending: false })
+          .limit(10);
+        
+        if (logsData) setLogs(logsData as LogEntry[]);
       }
     } catch (err) {
       console.error("❌ API Error:", err);
@@ -119,13 +136,16 @@ const ParentDashboard = () => {
         prevIsOnBusRef.current = updatedFields.is_on_bus;
         setChildren(current => current.map(c => c.id === updatedFields.id ? { ...c, ...updatedFields } : c));
         if (updatedFields.guardian_pin) setGuardianPin(updatedFields.guardian_pin);
+        
+        // Refresh logs when student status changes
+        loadData();
       }).subscribe();
 
     return () => {
       supabase.removeChannel(vanChannel);
       supabase.removeChannel(studentChannel);
     };
-  }, [children]);
+  }, [children, loadData]);
 
   if (loading) return <div className={`h-screen flex items-center justify-center ${theme.bg} font-black text-blue-600 animate-pulse`}>Safetrack Live...</div>;
 
@@ -160,14 +180,13 @@ const ParentDashboard = () => {
       <div className="px-5 mt-6 space-y-8">
         {/* AUTH CARD */}
         <section className="relative group">
-           <div className="absolute inset-0 bg-blue-600/5 blur-3xl -z-10 rounded-full" />
-           <div className={`${theme.card} rounded-[2.5rem] p-8 shadow-xl border ${theme.border} text-center relative overflow-hidden`}>
-              <p className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em] mb-6`}>
+            <div className="absolute inset-0 bg-blue-600/5 blur-3xl -z-10 rounded-full" />
+            <div className={`${theme.card} rounded-[2.5rem] p-8 shadow-xl border ${theme.border} text-center relative overflow-hidden`}>
+               <p className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em] mb-6`}>
                 {activeChild.is_on_bus ? "Drop-off Authentication" : "Pickup Authentication"}
               </p>
               
               <div className="inline-block p-4 bg-white rounded-3xl border border-slate-100 mb-6 shadow-sm relative">
-                 {/* UPDATED: QR now encodes the secret handover_token */}
                  <QRCodeSVG 
                    value={activeChild.handover_token || activeChild.id} 
                    size={150}
@@ -185,7 +204,7 @@ const ParentDashboard = () => {
                    ))}
                  </div>
               </div>
-           </div>
+            </div>
         </section>
 
         {/* LIVE TRACKING MAP */}
@@ -228,10 +247,21 @@ const ParentDashboard = () => {
           </div>
         </section>
 
-        {/* HISTORY SECTIONS */}
+        {/* HISTORY SECTIONS - UPDATED TO PASS LOGS */}
         <div className="space-y-6">
-           <HistorySection title="Pickup History" theme={theme} isDarkMode={isDarkMode} />
-           <HistorySection title="Drop-off History" theme={theme} isDarkMode={isDarkMode} isDropoff />
+            <HistorySection 
+              title="Pickup History" 
+              theme={theme} 
+              isDarkMode={isDarkMode} 
+              items={logs.filter(l => l.action_type === 'pickup')} 
+            />
+            <HistorySection 
+              title="Drop-off History" 
+              theme={theme} 
+              isDarkMode={isDarkMode} 
+              isDropoff 
+              items={logs.filter(l => l.action_type === 'dropoff')} 
+            />
         </div>
       </div>
     </div>
@@ -240,23 +270,28 @@ const ParentDashboard = () => {
 
 // --- HELPER COMPONENTS ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const HistorySection = ({ title, theme, isDropoff }: any) => (
+const HistorySection = ({ title, theme, items, isDropoff }: any) => (
   <section>
     <div className="flex justify-between items-center mb-4 px-2">
         <h3 className={`font-black ${theme.textMain} text-sm`}>{title}</h3>
         <button className="text-blue-600 text-[10px] font-bold uppercase">View All</button>
     </div>
     <div className={`${theme.card} rounded-4xl p-2 space-y-1 shadow-sm border ${theme.border}`}>
-        {isDropoff ? (
-            <>
-                <HistoryItem icon={<MapPin size={14} className="text-blue-600" />} title="Home Drop-off" time="04:15 PM" bus="Bus #42" status="Safe" statusColor="text-blue-600 bg-blue-500/10" theme={theme} />
-                <HistoryItem icon={<MapPin size={14} className="text-blue-600" />} title="School Drop-off" time="08:00 AM" bus="Bus #42" status="Safe" statusColor="text-blue-600 bg-blue-500/10" theme={theme} />
-            </>
+        {items && items.length > 0 ? (
+            items.map((log: LogEntry) => (
+                <HistoryItem 
+                    key={log.id}
+                    icon={isDropoff ? <MapPin size={14} className="text-blue-600" /> : <CheckCircle2 className="text-emerald-500" />} 
+                    title={isDropoff ? "School Drop-off" : "School Pickup"} 
+                    time={new Date(log.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 
+                    bus={`Van #${log.van_id.slice(-4)}`} 
+                    status="Verified" 
+                    statusColor={isDropoff ? "text-blue-600 bg-blue-500/10" : "text-emerald-500 bg-emerald-500/10"} 
+                    theme={theme} 
+                />
+            ))
         ) : (
-            <>
-                <HistoryItem icon={<CheckCircle2 className="text-emerald-500" />} title="School Pickup" time="03:45 PM" bus="Bus #42" status="Verified" statusColor="text-emerald-500 bg-emerald-500/10" theme={theme} />
-                <HistoryItem icon={<Clock className="text-amber-500" />} title="School Pickup" time="03:55 PM" bus="Bus #42" status="Delayed" statusColor="text-amber-500 bg-amber-500/10" theme={theme} />
-            </>
+            <div className={`p-8 text-center ${theme.textSub} text-[10px] font-bold uppercase`}>No records found</div>
         )}
     </div>
   </section>

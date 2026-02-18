@@ -90,10 +90,10 @@ async function verifyStudentHandover(req, res) {
   try {
     // 1️⃣ Fetch student record - MUST include handover_token
     const { data: student, error: fetchError } = await supabase
-      .from("students")
-      .select("id, name, guardian_pin, handover_token, assigned_van_id, status")
-      .eq("id", studentId)
-      .single();
+  .from("students")
+  .select("id, name, guardian_pin, handover_token, assigned_van_id, status, school_id") // Added school_id
+  .eq("id", studentId)
+  .single();
 
     if (fetchError || !student) {
       return res.status(404).json({ success: false, message: "Student not found" });
