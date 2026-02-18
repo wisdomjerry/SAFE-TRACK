@@ -437,7 +437,7 @@ const setPin = async (req, res) => {
 };
 
 // 1. Update Password
-exports.updatePassword = async (req, res) => {
+const updatePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const user = await User.findById(req.user.id).select('+password');
@@ -460,7 +460,7 @@ exports.updatePassword = async (req, res) => {
 };
 
 // 2. Update Profile (Phone, Location, etc.)
-exports.updateProfile = async (req, res) => {
+const updateProfile = async (req, res) => {
     try {
         const { phone, location, name } = req.body;
         const user = await User.findByIdAndUpdate(
@@ -475,7 +475,7 @@ exports.updateProfile = async (req, res) => {
 };
 
 // 3. Toggle Biometric (Server-side flag)
-exports.toggleBiometric = async (req, res) => {
+const toggleBiometric = async (req, res) => {
     try {
         const { enabled } = req.body;
         await User.findByIdAndUpdate(req.user.id, { biometric_enabled: enabled });

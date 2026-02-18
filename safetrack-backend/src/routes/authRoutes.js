@@ -10,6 +10,9 @@ const {
   startOtpLogin,
   verifyOtp,
   setPin,
+  updatePassword,
+  updateProfile,
+  toggleBiometric
 } = require("../controllers/authController");
 const { authenticate  } = require("../middleware/authMiddleware");
 
@@ -32,6 +35,12 @@ router.post("/logout", (req, res) => {
 // Add your verifyToken middleware here
 // Use authenticate instead of verifyToken
 router.get("/me", authenticate(), getProfile);
+
+// Password and Profile Management
+router.post("/update-password", authenticate(), updatePassword);
+router.put("/update-profile", authenticate(), updateProfile);
+router.post("/toggle-biometric", authenticate(), toggleBiometric);
+
 router.post("/notifications", authenticate(), sendNotification);
 router.get("/notifications", authenticate(), getNotifications);
 router.put("/notifications/read", authenticate(), markNotificationsRead);
