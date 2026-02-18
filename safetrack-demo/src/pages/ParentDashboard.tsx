@@ -7,6 +7,7 @@ import {
   MapPin,
   Phone,
   CheckCircle2,
+  Clock,
   ShieldCheck,
   ChevronRight,
   Sun,
@@ -22,7 +23,7 @@ interface Child {
   school_name: string;
   van_id: string;
   guardian_pin: string;
-  handover_token: string;
+  handover_token: string; // NEW: Added handover_token
   is_on_bus: boolean;
   status: string;
   lat: number;
@@ -34,24 +35,15 @@ interface Child {
   driver_phone?: string;
 }
 
-interface HistoryLog {
-  id: string;
-  type: 'pickup' | 'dropoff';
-  status: string;
-  created_at: string;
-  location_name: string;
-  van_name?: string;
-}
-
 const ParentDashboard = () => {
   const [children, setChildren] = useState<Child[]>([]);
-  const [historyLogs, setHistoryLogs] = useState<HistoryLog[]>([]); // Added history state
   const [loading, setLoading] = useState(true);
   const [guardianPin, setGuardianPin] = useState("");
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false); // Dark Mode State
   const prevIsOnBusRef = useRef<boolean>(false);
 
+  // Theme Logic
   const theme = {
     bg: isDarkMode ? 'bg-[#0F0F10]' : 'bg-[#F4F7FA]',
     card: isDarkMode ? 'bg-[#1C1C1E]' : 'bg-white',
@@ -71,16 +63,6 @@ const ParentDashboard = () => {
         const activeChild = childrenData[0];
         setGuardianPin(activeChild.guardian_pin || "");
         prevIsOnBusRef.current = activeChild.is_on_bus;
-
-        // Fetch History from Backend
-        try {
-          const historyRes = await axios.get(`/api/parents/history/${activeChild.id}`);
-          if (historyRes.data.success) {
-            setHistoryLogs(historyRes.data.data);
-          }
-        } catch (hErr) {
-          console.error("❌ History fetch error:", hErr);
-        }
 
         const { data: history } = await supabase
           .from("van_location_history")
@@ -151,6 +133,7 @@ const ParentDashboard = () => {
 
   return (
     <div className={`${theme.bg} min-h-screen pb-32 transition-colors duration-300`}>
+      {/* HEADER */}
       <header className={`${theme.card} backdrop-blur-md sticky top-0 z-40 px-6 pt-10 pb-6 flex justify-between items-start border-b ${theme.border}`}>
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -158,7 +141,7 @@ const ParentDashboard = () => {
              <span className={`text-sm font-bold ${theme.textMain} tracking-tight`}>SafeTrack</span>
           </div>
           <p className={`${theme.textSub} text-xs font-medium`}>Good Morning,</p>
-          <h1 className={`text-2xl font-black ${theme.textMain} leading-tight`}>{activeChild?.full_name}</h1>
+          <h1 className={`text-2xl font-black ${theme.textMain} leading-tight`}>{activeChild.full_name}</h1>
         </div>
         <div className="flex gap-2">
             <button 
@@ -175,16 +158,18 @@ const ParentDashboard = () => {
       </header>
 
       <div className="px-5 mt-6 space-y-8">
+        {/* AUTH CARD */}
         <section className="relative group">
            <div className="absolute inset-0 bg-blue-600/5 blur-3xl -z-10 rounded-full" />
            <div className={`${theme.card} rounded-[2.5rem] p-8 shadow-xl border ${theme.border} text-center relative overflow-hidden`}>
               <p className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em] mb-6`}>
-                {activeChild?.is_on_bus ? "Drop-off Authentication" : "Pickup Authentication"}
+                {activeChild.is_on_bus ? "Drop-off Authentication" : "Pickup Authentication"}
               </p>
               
               <div className="inline-block p-4 bg-white rounded-3xl border border-slate-100 mb-6 shadow-sm relative">
+                 {/* UPDATED: QR now encodes the secret handover_token */}
                  <QRCodeSVG 
-                   value={activeChild?.handover_token || activeChild?.id || "N/A"} 
+                   value={activeChild.handover_token || activeChild.id} 
                    size={150}
                    level="H"
                  />
@@ -203,10 +188,11 @@ const ParentDashboard = () => {
            </div>
         </section>
 
+        {/* LIVE TRACKING MAP */}
         <section>
           <div className="flex justify-between items-center mb-4 px-2">
             <h3 className={`font-black ${theme.textMain} text-sm uppercase tracking-tight`}>Live Route</h3>
-            {activeChild?.is_on_bus && (
+            {activeChild.is_on_bus && (
               <span className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
                 ON BOARD
@@ -216,11 +202,11 @@ const ParentDashboard = () => {
           <div className={`${theme.card} rounded-[2.5rem] p-2 shadow-lg border ${theme.border} overflow-hidden`}>
              <div className="h-56 w-full rounded-[2.2rem] overflow-hidden">
                 <LiveMap 
-                  lat={activeChild?.lat} 
-                  lng={activeChild?.lng} 
-                  isOnBus={activeChild?.is_on_bus} 
+                  lat={activeChild.lat} 
+                  lng={activeChild.lng} 
+                  isOnBus={activeChild.is_on_bus} 
                   routePath={routePath}
-                  heading={activeChild?.heading}
+                  heading={activeChild.heading}
                 />
              </div>
              <div className="p-4 flex items-center justify-between">
@@ -231,31 +217,21 @@ const ParentDashboard = () => {
                    <div>
                       <p className={`text-[10px] ${theme.textSub} font-black uppercase tracking-tighter`}>Current Location</p>
                       <p className={`text-xs font-bold ${theme.textMain} truncate max-w-45`}>
-                        {activeChild?.current_location_name || "Locating vehicle..."}
+                        {activeChild.current_location_name || "Locating vehicle..."}
                       </p>
                    </div>
                 </div>
-                <a href={`tel:${activeChild?.driver_phone}`} className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+                <a href={`tel:${activeChild.driver_phone}`} className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
                    <Phone size={18} />
                 </a>
              </div>
           </div>
         </section>
 
-        {/* HISTORY SECTIONS - Linked to real historyLogs */}
+        {/* HISTORY SECTIONS */}
         <div className="space-y-6">
-           <HistorySection 
-             title="Pickup History" 
-             theme={theme} 
-             logs={historyLogs} 
-             typeFilter="pickup" 
-           />
-           <HistorySection 
-             title="Drop-off History" 
-             theme={theme} 
-             logs={historyLogs} 
-             typeFilter="dropoff" 
-           />
+           <HistorySection title="Pickup History" theme={theme} isDarkMode={isDarkMode} />
+           <HistorySection title="Drop-off History" theme={theme} isDarkMode={isDarkMode} isDropoff />
         </div>
       </div>
     </div>
@@ -264,37 +240,27 @@ const ParentDashboard = () => {
 
 // --- HELPER COMPONENTS ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const HistorySection = ({ title, theme, logs, typeFilter }: any) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filteredLogs = logs.filter((log: any) => log.type === typeFilter);
-
-  return (
-    <section>
-      <div className="flex justify-between items-center mb-4 px-2">
-          <h3 className={`font-black ${theme.textMain} text-sm`}>{title}</h3>
-          <button className="text-blue-600 text-[10px] font-bold uppercase">View All</button>
-      </div>
-      <div className={`${theme.card} rounded-4xl p-2 space-y-1 shadow-sm border ${theme.border}`}>
-          {filteredLogs.length > 0 ? (
-            filteredLogs.map((log: HistoryLog) => (
-              <HistoryItem 
-                key={log.id}
-                icon={log.type === 'pickup' ? <CheckCircle2 size={14} className="text-emerald-500" /> : <MapPin size={14} className="text-blue-600" />}
-                title={log.location_name || (log.type === 'pickup' ? "School Pickup" : "Home Drop-off")}
-                time={new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                bus={log.van_name || "Assigned Van"}
-                status={log.status || "Verified"}
-                statusColor={log.status === 'delayed' ? "text-amber-500 bg-amber-500/10" : "text-emerald-500 bg-emerald-500/10"}
-                theme={theme}
-              />
-            ))
-          ) : (
-            <div className="p-6 text-center text-xs opacity-50 font-medium">No history available</div>
-          )}
-      </div>
-    </section>
-  );
-};
+const HistorySection = ({ title, theme, isDropoff }: any) => (
+  <section>
+    <div className="flex justify-between items-center mb-4 px-2">
+        <h3 className={`font-black ${theme.textMain} text-sm`}>{title}</h3>
+        <button className="text-blue-600 text-[10px] font-bold uppercase">View All</button>
+    </div>
+    <div className={`${theme.card} rounded-4xl p-2 space-y-1 shadow-sm border ${theme.border}`}>
+        {isDropoff ? (
+            <>
+                <HistoryItem icon={<MapPin size={14} className="text-blue-600" />} title="Home Drop-off" time="04:15 PM" bus="Bus #42" status="Safe" statusColor="text-blue-600 bg-blue-500/10" theme={theme} />
+                <HistoryItem icon={<MapPin size={14} className="text-blue-600" />} title="School Drop-off" time="08:00 AM" bus="Bus #42" status="Safe" statusColor="text-blue-600 bg-blue-500/10" theme={theme} />
+            </>
+        ) : (
+            <>
+                <HistoryItem icon={<CheckCircle2 className="text-emerald-500" />} title="School Pickup" time="03:45 PM" bus="Bus #42" status="Verified" statusColor="text-emerald-500 bg-emerald-500/10" theme={theme} />
+                <HistoryItem icon={<Clock className="text-amber-500" />} title="School Pickup" time="03:55 PM" bus="Bus #42" status="Delayed" statusColor="text-amber-500 bg-amber-500/10" theme={theme} />
+            </>
+        )}
+    </div>
+  </section>
+);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const HistoryItem = ({ icon, title, time, bus, status, statusColor, theme }: any) => (
