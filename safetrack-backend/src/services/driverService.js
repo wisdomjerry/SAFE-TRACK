@@ -73,10 +73,10 @@ async function getDriverDashboardService(driver_id, school_id) {
     };
   }
 
-  // UPDATED: Added parent_phone so the Phone icon in your TSX works!
+  // FIXED: Included handover_token and photo_url
   const { data: students, error: studentError } = await supabase
     .from("students")
-    .select("id, name, home_address, is_on_bus, status, parent_phone")
+    .select("id, name, home_address, is_on_bus, status, parent_phone, handover_token, avatar_url")
     .eq("assigned_van_id", van.id);
 
   if (studentError) throw new Error("Error fetching students: " + studentError.message);
@@ -84,7 +84,7 @@ async function getDriverDashboardService(driver_id, school_id) {
   return { van, students: students || [] };
 }
 
-// GET DRIVER ROUTE
+// --- GET DRIVER ROUTE ---
 async function getDriverRouteService(driver_id) {
   const { data: driverData } = await supabase
     .from("drivers")
@@ -94,9 +94,10 @@ async function getDriverRouteService(driver_id) {
 
   if (!driverData?.assigned_van_id) return [];
 
+  // FIXED: Included handover_token and photo_url here too
   const { data: students, error } = await supabase
     .from("students")
-    .select("id, name, parent_phone, is_on_bus, home_address, status")
+    .select("id, name, parent_phone, is_on_bus, home_address, status, handover_token, avatar_url")
     .eq("assigned_van_id", driverData.assigned_van_id);
 
   if (error) throw new Error(error.message);

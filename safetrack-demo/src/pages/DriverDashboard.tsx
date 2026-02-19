@@ -87,53 +87,68 @@ const DriverDashboard = () => {
     return () => clearInterval(interval);
   }, [tripActive, fetchDashboardData]);
 
+  // Add this near your other useEffects
+  useEffect(() => {
+    // Get immediate location on load so the map isn't "stuck" in the past
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        // If we don't have van data yet, or it's old,
+        // we can use this to center the map initially
+        console.log("Initial GPS Lock:", latitude, longitude);
+      },
+      (error) => console.error("Initial GPS Error:", error),
+      { enableHighAccuracy: true },
+    );
+  }, []);
+
   // NEW: Native Barcode Scanner Logic
   const startNativeScan = async () => {
-  try {
-    const status = await BarcodeScanner.checkPermissions();
-    if (status.camera !== "granted") {
-      await BarcodeScanner.requestPermissions();
-    }
-
-    document.body.classList.add("barcode-scanner-active");
-    setIsScanning(true);
-
-    const result = await BarcodeScanner.scan();
-
-    if (result.barcodes && result.barcodes.length > 0) {
-      // Use .trim() to remove accidental whitespace from the scan
-      const rawValue = result.barcodes[0].displayValue.trim();
-
-      // LOGIC: Search your local roster
-      const student = students.find((s) => {
-        // Match against Token (if it exists) OR the UUID (id)
-        // We use lowercase comparison to be 100% safe with UUIDs
-        return (
-          (s.handover_token && s.handover_token === rawValue) || 
-          (s.id && s.id.toLowerCase() === rawValue.toLowerCase())
-        );
-      });
-
-      if (student) {
-        // If it matched the token, store it. If it matched the ID, scannedToken stays null.
-        const isTokenMatch = student.handover_token === rawValue;
-        setScannedToken(isTokenMatch ? rawValue : null);
-        
-        setSelectedStudent(student);
-        setShowVerifyModal(true);
-      } else {
-        // Debugging help: tells you what it actually saw vs what it was looking for
-        console.error("No match for scanned value:", rawValue);
-        alert(`Invalid Student ID: ${rawValue.substring(0, 8)}...`);
+    try {
+      const status = await BarcodeScanner.checkPermissions();
+      if (status.camera !== "granted") {
+        await BarcodeScanner.requestPermissions();
       }
-    }
 
-    await stopNativeScan();
-  } catch (error) {
-    console.error("Scanner error:", error);
-    await stopNativeScan();
-  }
-};
+      document.body.classList.add("barcode-scanner-active");
+      setIsScanning(true);
+
+      const result = await BarcodeScanner.scan();
+
+      if (result.barcodes && result.barcodes.length > 0) {
+        // Use .trim() to remove accidental whitespace from the scan
+        const rawValue = result.barcodes[0].displayValue.trim();
+
+        // LOGIC: Search your local roster
+        const student = students.find((s) => {
+          // Match against Token (if it exists) OR the UUID (id)
+          // We use lowercase comparison to be 100% safe with UUIDs
+          return (
+            (s.handover_token && s.handover_token === rawValue) ||
+            (s.id && s.id.toLowerCase() === rawValue.toLowerCase())
+          );
+        });
+
+        if (student) {
+          // If it matched the token, store it. If it matched the ID, scannedToken stays null.
+          const isTokenMatch = student.handover_token === rawValue;
+          setScannedToken(isTokenMatch ? rawValue : null);
+
+          setSelectedStudent(student);
+          setShowVerifyModal(true);
+        } else {
+          // Debugging help: tells you what it actually saw vs what it was looking for
+          console.error("No match for scanned value:", rawValue);
+          alert(`Invalid Student ID: ${rawValue.substring(0, 8)}...`);
+        }
+      }
+
+      await stopNativeScan();
+    } catch (error) {
+      console.error("Scanner error:", error);
+      await stopNativeScan();
+    }
+  };
 
   const stopNativeScan = async () => {
     document.body.classList.remove("barcode-scanner-active");
@@ -351,8 +366,15 @@ const DriverDashboard = () => {
           className={`${theme.card} rounded-[2.5rem] p-2 border ${theme.border} overflow-hidden shadow-lg`}
         >
           <div className="relative h-96 w-full rounded-[2.2rem] bg-slate-800 overflow-hidden border border-white/5">
+            {/* PRIORITY: Use van coordinates from the database, 
+      but ensure your useGpsBroadcaster hook is actually 
+      firing to keep these coordinates fresh! 
+    */}
             {van?.current_lat && van?.current_lng ? (
               <MapContainer
+                // Use key to force map to re-mount if van ID changes,
+                // ensuring we don't get stuck on old coordinates.
+                key={van.id}
                 center={[van.current_lat, van.current_lng]}
                 zoom={17}
                 zoomControl={false}
@@ -369,23 +391,26 @@ const DriverDashboard = () => {
                       : "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
                   }
                 />
+
+                {/* The Van Marker */}
                 <Marker
                   position={[van.current_lat, van.current_lng]}
                   icon={icon}
                 />
+
+                {/* This component forces the map to follow the blue dot */}
                 <RecenterMap lat={van.current_lat} lng={van.current_lng} />
               </MapContainer>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
                 <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-3" />
                 <p className="text-[10px] font-black uppercase text-slate-500">
-                  Connecting GPS...
+                  Waiting for GPS Signal...
                 </p>
               </div>
             )}
           </div>
         </section>
-
         {/* Stats Section */}
         <section
           className={`${theme.card} rounded-4xl p-6 border ${theme.border}`}

@@ -8,7 +8,6 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
 
   useEffect(() => {
     if (!isActive || !vanId) return;
-    
 
     const getAddress = async (lat: number, lng: number) => {
       try {
@@ -19,7 +18,7 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
         const data = await res.json();
         // Returns "Street Name, Area"
         return data.display_name.split(",").slice(0, 2).join(",");
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         return null;
       }
@@ -28,18 +27,8 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
     const updateLocation = async (position: GeolocationPosition) => {
       const { latitude, longitude, speed, heading } = position.coords;
 
-      const isFirstRun = lastCoords.current.lat === 0;
-
-      // Logic: Only save history if moved ~10-15m (approx 0.0001 degrees)
-      // This prevents database bloat
-      const hasMovedEnoughForHistory =
-        Math.abs(latitude - lastCoords.current.lat) > 0.0001 ||
-        Math.abs(longitude - lastCoords.current.lng) > 0.0001;
-
-      const hasMovedSignificant =
-        Math.abs(latitude - lastCoords.current.lat) > 0.0005 ||
-        Math.abs(longitude - lastCoords.current.lng) > 0.0005;
-
+      // IMPORTANT: We update the 'vans' table EVERY time the phone moves,
+      // even by 1 meter. This ensures the "Live" map is always perfect.
       const updateData: any = {
         current_lat: latitude,
         current_lng: longitude,
@@ -47,6 +36,13 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
         current_speed: Math.round((speed || 0) * 3.6),
         last_updated: new Date().toISOString(),
       };
+
+      // We only do the expensive Address lookup (Reverse Geocoding)
+      // if they have moved significantly (approx 50m)
+      const isFirstRun = lastCoords.current.lat === 0;
+      const hasMovedSignificant =
+        Math.abs(latitude - lastCoords.current.lat) > 0.0005 ||
+        Math.abs(longitude - lastCoords.current.lng) > 0.0005;
 
       if (isFirstRun || hasMovedSignificant) {
         const currentAddress = await getAddress(latitude, longitude);
@@ -56,27 +52,18 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
         lastCoords.current = { lat: latitude, lng: longitude };
       }
 
-      // A. Sync current state to 'vans' table
-      const { error: vanError } = await supabase
-        .from("vans")
-        .update(updateData)
-        .eq("id", vanId);
+      // Sync to Supabase - This is what moves the marker on the map
+      await supabase.from("vans").update(updateData).eq("id", vanId);
 
-      if (vanError) console.error("Vans Sync Error:", vanError.message);
-
-      // B. NEW: Insert breadcrumb into history table
-      if (isFirstRun || hasMovedEnoughForHistory) {
-        const { error: histError } = await supabase
-          .from("van_location_history")
-          .insert([
-            {
-              van_id: vanId,
-              lat: latitude,
-              lng: longitude,
-            },
-          ]);
-
-        if (histError) console.error("History Sync Error:", histError.message);
+      // History inserts (breadcrumbs) should still stay strict to save DB space
+      if (isFirstRun || Math.abs(latitude - lastCoords.current.lat) > 0.0001) {
+        await supabase.from("van_location_history").insert([
+          {
+            van_id: vanId,
+            lat: latitude,
+            lng: longitude,
+          },
+        ]);
       }
     };
 
@@ -85,7 +72,7 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
       (error) => console.error("GPS Watch Error:", error),
       {
         enableHighAccuracy: true,
-        maximumAge: 5000,
+        maximumAge: 0,
         timeout: 10000,
       },
     );
