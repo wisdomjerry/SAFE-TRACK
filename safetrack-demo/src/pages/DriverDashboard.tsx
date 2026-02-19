@@ -89,40 +89,51 @@ const DriverDashboard = () => {
 
   // NEW: Native Barcode Scanner Logic
   const startNativeScan = async () => {
-    try {
-      const status = await BarcodeScanner.checkPermissions();
-      if (status.camera !== "granted") {
-        await BarcodeScanner.requestPermissions();
-      }
-
-      // Prepare UI
-      document.body.classList.add("barcode-scanner-active");
-      setIsScanning(true);
-
-      // CHANGE: Use .scan() instead of .startScan()
-      const result = await BarcodeScanner.scan();
-
-      // Now 'result.barcodes' will be recognized by TypeScript
-      if (result.barcodes && result.barcodes.length > 0) {
-        const rawValue = result.barcodes[0].displayValue;
-        const student = students.find((s) => s.handover_token === rawValue);
-
-        if (student) {
-          setScannedToken(rawValue);
-          setSelectedStudent(student);
-          setShowVerifyModal(true);
-        } else {
-          alert("Invalid Student ID Scanned");
-        }
-      }
-
-      // Cleanup UI after scan is finished
-      await stopNativeScan();
-    } catch (error) {
-      console.error("Scanner error:", error);
-      await stopNativeScan();
+  try {
+    const status = await BarcodeScanner.checkPermissions();
+    if (status.camera !== "granted") {
+      await BarcodeScanner.requestPermissions();
     }
-  };
+
+    document.body.classList.add("barcode-scanner-active");
+    setIsScanning(true);
+
+    const result = await BarcodeScanner.scan();
+
+    if (result.barcodes && result.barcodes.length > 0) {
+      // Use .trim() to remove accidental whitespace from the scan
+      const rawValue = result.barcodes[0].displayValue.trim();
+
+      // LOGIC: Search your local roster
+      const student = students.find((s) => {
+        // Match against Token (if it exists) OR the UUID (id)
+        // We use lowercase comparison to be 100% safe with UUIDs
+        return (
+          (s.handover_token && s.handover_token === rawValue) || 
+          (s.id && s.id.toLowerCase() === rawValue.toLowerCase())
+        );
+      });
+
+      if (student) {
+        // If it matched the token, store it. If it matched the ID, scannedToken stays null.
+        const isTokenMatch = student.handover_token === rawValue;
+        setScannedToken(isTokenMatch ? rawValue : null);
+        
+        setSelectedStudent(student);
+        setShowVerifyModal(true);
+      } else {
+        // Debugging help: tells you what it actually saw vs what it was looking for
+        console.error("No match for scanned value:", rawValue);
+        alert(`Invalid Student ID: ${rawValue.substring(0, 8)}...`);
+      }
+    }
+
+    await stopNativeScan();
+  } catch (error) {
+    console.error("Scanner error:", error);
+    await stopNativeScan();
+  }
+};
 
   const stopNativeScan = async () => {
     document.body.classList.remove("barcode-scanner-active");
