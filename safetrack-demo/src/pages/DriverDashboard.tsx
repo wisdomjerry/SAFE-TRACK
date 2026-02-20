@@ -108,7 +108,8 @@ const DriverDashboard = () => {
     try {
       console.log("LOGCAT_DEBUG: Scanner Started");
       const status = await BarcodeScanner.checkPermissions();
-      if (status.camera !== "granted") await BarcodeScanner.requestPermissions();
+      if (status.camera !== "granted")
+        await BarcodeScanner.requestPermissions();
 
       document.body.classList.add("barcode-scanner-active");
       setIsScanning(true);
@@ -119,19 +120,32 @@ const DriverDashboard = () => {
       if (result && result.barcodes && result.barcodes.length > 0) {
         const rawValue = (result.barcodes?.[0]?.rawValue ?? "").trim();
 
-if (!rawValue) return; // Exit if empty
-        
+        if (!rawValue) return; // Exit if empty
+
+        console.log("SUCCESSFULLY SCANNED:", rawValue);
+
+// ADD THESE 3 LINES:
+console.log("ROSTER SIZE:", students.length);
+console.log("FIRST STUDENT IN LIST:", students[0]);
+console.log("ALL STUDENT IDs:", students.map(s => s.id));
+
         console.log("LOGCAT_DEBUG: Scanned Value ->", `"${rawValue}"`);
-        console.log("LOGCAT_DEBUG: Total Students in State ->", students.length);
+        console.log(
+          "LOGCAT_DEBUG: Total Students in State ->",
+          students.length,
+        );
 
         // Print every student so we can see the exact keys and values
         students.forEach((s, i) => {
-          console.log(`LOGCAT_DEBUG: Student[${i}] -> ID: "${s.id}" | Token: "${s.handover_token}" | Name: ${s.name}`);
+          console.log(
+            `LOGCAT_DEBUG: Student[${i}] -> ID: "${s.id}" | Token: "${s.handover_token}" | Name: ${s.name}`,
+          );
         });
 
         const student = students.find((s) => {
           // Check both ID and Token, force to string to avoid type mismatches
-          const idMatch = s.id?.toString().toLowerCase() === rawValue.toLowerCase();
+          const idMatch =
+            s.id?.toString().toLowerCase() === rawValue.toLowerCase();
           const tokenMatch = s.handover_token?.toString() === rawValue;
           return idMatch || tokenMatch;
         });
@@ -144,7 +158,9 @@ if (!rawValue) return; // Exit if empty
           setPinInput("");
           setShowVerifyModal(true);
         } else {
-          console.error("LOGCAT_DEBUG: MATCH FAILED. Scanned value does not exist in the list above.");
+          console.error(
+            "LOGCAT_DEBUG: MATCH FAILED. Scanned value does not exist in the list above.",
+          );
           alert(`Student not found: ${rawValue.substring(0, 8)}...`);
         }
       }
