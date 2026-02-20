@@ -117,34 +117,16 @@ const DriverDashboard = () => {
       await stopNativeScan();
 
       if (result?.barcodes?.length > 0) {
-        // 1. Safely access the value. If it's missing, rawValue becomes undefined.
         const rawValue = result.barcodes?.[0]?.rawValue?.trim();
 
-        // 2. Add a guard clause to stop execution if the value is missing.
         if (!rawValue) {
           console.log("No barcode data detected.");
-          await stopNativeScan();
           return;
         }
 
-        // 3. Now TypeScript knows 'rawValue' is a string.
         console.log("SUCCESSFULLY SCANNED:", rawValue);
 
-        // --- NEW DEBUG LOGS START ---
-        console.log("1. SCANNED VALUE:", rawValue);
-        console.log("2. STUDENTS IN MEMORY:", students.length);
-
-        if (students.length > 0) {
-          console.log("3. KEYS IN STUDENT OBJECT:", Object.keys(students[0]));
-          console.log(
-            "4. FULL DATA FOR STUDENT[0]:",
-            JSON.stringify(students[0]),
-          );
-        }
-        // --- NEW DEBUG LOGS END ---
-
         const student = students.find((s) => {
-          // Attempting match on several possible field names
           return (
             s.handover_token === rawValue ||
             s.id?.toString() === rawValue ||
@@ -154,14 +136,20 @@ const DriverDashboard = () => {
 
         if (student) {
           console.log("MATCH FOUND:", student.name);
-          setScannedToken(
-            student.handover_token === rawValue ? rawValue : null,
-          );
+
+          // FIX: If we matched the ID, we use the handover_token for the backend call
+          // This ensures 'scannedToken' is NEVER null if a match was found.
+          setScannedToken(student.handover_token);
+
           setSelectedStudent(student);
-          setShowVerifyModal(true);
+
+          // Short delay to ensure state is set before UI pops up
+          setTimeout(() => {
+            setShowVerifyModal(true);
+          }, 100);
         } else {
           console.warn("NO MATCH IN ROSTER FOR:", rawValue);
-          alert(`Not Found. Roster size: ${students.length}`);
+          alert(`Student not found in your current trip roster.`);
         }
       }
     } catch (error) {
