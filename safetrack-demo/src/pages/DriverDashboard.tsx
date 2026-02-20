@@ -106,10 +106,8 @@ const DriverDashboard = () => {
   // REWRITTEN: Native Barcode Scanner Logic with correct property access
   const startNativeScan = async () => {
     try {
-      console.log("LOGCAT_DEBUG: Scanner Started");
       const status = await BarcodeScanner.checkPermissions();
-      if (status.camera !== "granted")
-        await BarcodeScanner.requestPermissions();
+      if (status.camera !== "granted") await BarcodeScanner.requestPermissions();
 
       document.body.classList.add("barcode-scanner-active");
       setIsScanning(true);
@@ -117,55 +115,51 @@ const DriverDashboard = () => {
       const result = await BarcodeScanner.scan();
       await stopNativeScan();
 
-      if (result && result.barcodes && result.barcodes.length > 0) {
-        const rawValue = (result.barcodes?.[0]?.rawValue ?? "").trim();
+      if (result?.barcodes?.length > 0) {
+        // 1. Safely access the value. If it's missing, rawValue becomes undefined.
+const rawValue = result.barcodes?.[0]?.rawValue?.trim();
 
-        if (!rawValue) return; // Exit if empty
+// 2. Add a guard clause to stop execution if the value is missing.
+if (!rawValue) {
+  console.log("No barcode data detected.");
+  await stopNativeScan();
+  return;
+}
 
-        console.log("SUCCESSFULLY SCANNED:", rawValue);
-
-// ADD THESE 3 LINES:
-console.log("ROSTER SIZE:", students.length);
-console.log("FIRST STUDENT IN LIST:", students[0]);
-console.log("ALL STUDENT IDs:", students.map(s => s.id));
-
-        console.log("LOGCAT_DEBUG: Scanned Value ->", `"${rawValue}"`);
-        console.log(
-          "LOGCAT_DEBUG: Total Students in State ->",
-          students.length,
-        );
-
-        // Print every student so we can see the exact keys and values
-        students.forEach((s, i) => {
-          console.log(
-            `LOGCAT_DEBUG: Student[${i}] -> ID: "${s.id}" | Token: "${s.handover_token}" | Name: ${s.name}`,
-          );
-        });
+// 3. Now TypeScript knows 'rawValue' is a string.
+console.log("SUCCESSFULLY SCANNED:", rawValue);
+        
+        // --- NEW DEBUG LOGS START ---
+        console.log("1. SCANNED VALUE:", rawValue);
+        console.log("2. STUDENTS IN MEMORY:", students.length);
+        
+        if (students.length > 0) {
+            console.log("3. KEYS IN STUDENT OBJECT:", Object.keys(students[0]));
+            console.log("4. FULL DATA FOR STUDENT[0]:", JSON.stringify(students[0]));
+        }
+        // --- NEW DEBUG LOGS END ---
 
         const student = students.find((s) => {
-          // Check both ID and Token, force to string to avoid type mismatches
-          const idMatch =
-            s.id?.toString().toLowerCase() === rawValue.toLowerCase();
-          const tokenMatch = s.handover_token?.toString() === rawValue;
-          return idMatch || tokenMatch;
+          // Attempting match on several possible field names
+          return (
+            s.handover_token === rawValue ||
+            s.id?.toString() === rawValue ||
+            s.student_id?.toString() === rawValue
+          );
         });
 
         if (student) {
-          console.log("LOGCAT_DEBUG: MATCH SUCCESS found for:", student.name);
-          const isTokenMatch = student.handover_token === rawValue;
-          setScannedToken(isTokenMatch ? rawValue : null);
+          console.log("MATCH FOUND:", student.name);
+          setScannedToken(student.handover_token === rawValue ? rawValue : null);
           setSelectedStudent(student);
-          setPinInput("");
           setShowVerifyModal(true);
         } else {
-          console.error(
-            "LOGCAT_DEBUG: MATCH FAILED. Scanned value does not exist in the list above.",
-          );
-          alert(`Student not found: ${rawValue.substring(0, 8)}...`);
+          console.warn("NO MATCH IN ROSTER FOR:", rawValue);
+          alert(`Not Found. Roster size: ${students.length}`);
         }
       }
     } catch (error) {
-      console.error("LOGCAT_DEBUG: Scanner Exception:", error);
+      console.error("SCAN ERROR:", error);
       await stopNativeScan();
     }
   };
