@@ -106,73 +106,50 @@ const DriverDashboard = () => {
   // REWRITTEN: Native Barcode Scanner Logic with correct property access
   const startNativeScan = async () => {
     try {
+      console.log("LOGCAT_DEBUG: Scanner Started");
       const status = await BarcodeScanner.checkPermissions();
-      if (status.camera !== "granted") {
-        await BarcodeScanner.requestPermissions();
-      }
+      if (status.camera !== "granted") await BarcodeScanner.requestPermissions();
 
       document.body.classList.add("barcode-scanner-active");
       setIsScanning(true);
 
       const result = await BarcodeScanner.scan();
-
-      // Cleanup UI
       await stopNativeScan();
 
       if (result && result.barcodes && result.barcodes.length > 0) {
-        // 1. Safely access the value. If it's missing, rawValue becomes undefined.
-        const rawValue = result.barcodes?.[0]?.rawValue?.trim();
+        const rawValue = (result.barcodes?.[0]?.rawValue ?? "").trim();
 
-        // 2. Add a guard clause to stop execution if the value is missing.
-        if (!rawValue) {
-          console.log("No barcode data detected.");
-          await stopNativeScan();
-          return;
-        }
+if (!rawValue) return; // Exit if empty
+        
+        console.log("LOGCAT_DEBUG: Scanned Value ->", `"${rawValue}"`);
+        console.log("LOGCAT_DEBUG: Total Students in State ->", students.length);
 
-        // 3. Now TypeScript knows 'rawValue' is a string.
-        console.log("SUCCESSFULLY SCANNED:", rawValue);
+        // Print every student so we can see the exact keys and values
+        students.forEach((s, i) => {
+          console.log(`LOGCAT_DEBUG: Student[${i}] -> ID: "${s.id}" | Token: "${s.handover_token}" | Name: ${s.name}`);
+        });
 
-        console.log("--- SCAN DEBUG START ---");
-        console.log("SCANNED VALUE:", `"${rawValue}"`);
-        console.log("TOTAL STUDENTS IN ROSTER:", students.length);
-
-        // 1. Log the first student to see the exact object keys
-        if (students.length > 0) {
-          console.log("SAMPLE STUDENT OBJECT:", JSON.stringify(students[0]));
-        }
-
-        // 2. Perform the search with internal logging
         const student = students.find((s) => {
-          const isTokenMatch = s.handover_token === rawValue;
-          const isIdMatch =
-            s.id?.toString().toLowerCase() === rawValue.toLowerCase();
-
-          if (isTokenMatch || isIdMatch) {
-            console.log(
-              "MATCH FOUND:",
-              s.name,
-              "via",
-              isTokenMatch ? "Token" : "ID",
-            );
-          }
-          return isTokenMatch || isIdMatch;
+          // Check both ID and Token, force to string to avoid type mismatches
+          const idMatch = s.id?.toString().toLowerCase() === rawValue.toLowerCase();
+          const tokenMatch = s.handover_token?.toString() === rawValue;
+          return idMatch || tokenMatch;
         });
 
         if (student) {
+          console.log("LOGCAT_DEBUG: MATCH SUCCESS found for:", student.name);
           const isTokenMatch = student.handover_token === rawValue;
           setScannedToken(isTokenMatch ? rawValue : null);
           setSelectedStudent(student);
           setPinInput("");
           setShowVerifyModal(true);
         } else {
-          console.error("MATCH FAIL: No student found with that value.");
-          alert(`Student not found. Scanned: ${rawValue.substring(0, 8)}...`);
+          console.error("LOGCAT_DEBUG: MATCH FAILED. Scanned value does not exist in the list above.");
+          alert(`Student not found: ${rawValue.substring(0, 8)}...`);
         }
-        console.log("--- SCAN DEBUG END ---");
       }
     } catch (error) {
-      console.error("Scanner error:", error);
+      console.error("LOGCAT_DEBUG: Scanner Exception:", error);
       await stopNativeScan();
     }
   };
