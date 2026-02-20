@@ -114,41 +114,26 @@ const DriverDashboard = () => {
       setIsScanning(true);
 
       const result = await BarcodeScanner.scan();
-      await stopNativeScan();
+      await stopNativeScan(); // Hide camera overlay
 
       if (result?.barcodes?.length > 0) {
         const rawValue = result.barcodes?.[0]?.rawValue?.trim();
-
-        if (!rawValue) {
-          console.log("No barcode data detected.");
-          return;
-        }
+        if (!rawValue) return;
 
         console.log("SUCCESSFULLY SCANNED:", rawValue);
 
-        const student = students.find((s) => {
-          return (
+        const student = students.find(
+          (s) =>
             s.handover_token === rawValue ||
             s.id?.toString() === rawValue ||
-            s.student_id?.toString() === rawValue
-          );
-        });
+            s.student_id?.toString() === rawValue,
+        );
 
         if (student) {
-          console.log("MATCH FOUND:", student.name);
-
-          // FIX: If we matched the ID, we use the handover_token for the backend call
-          // This ensures 'scannedToken' is NEVER null if a match was found.
-          setScannedToken(student.handover_token);
-
-          setSelectedStudent(student);
-
-          // Short delay to ensure state is set before UI pops up
-          setTimeout(() => {
-            setShowVerifyModal(true);
-          }, 100);
+          console.log("MATCH FOUND, AUTO-VERIFYING:", student.name);
+          // We pass data directly to avoid waiting for React state updates
+          await performVerification(student, student.handover_token, "QR_SCAN");
         } else {
-          console.warn("NO MATCH IN ROSTER FOR:", rawValue);
           alert(`Student not found in your current trip roster.`);
         }
       }
@@ -186,65 +171,60 @@ const DriverDashboard = () => {
     setShowVerifyModal(true);
   };
 
-  const submitVerification = async () => {
-    // 1. Check: If no QR was scanned, we MUST have a 6-digit PIN.
-    // If a QR was scanned, we allow the PIN to be empty.
-    const isQrVerify = !!scannedToken;
-    if (!isQrVerify && (!pinInput || pinInput.length < 6)) {
-      alert("Please enter the 6-digit PIN or scan the QR code.");
-      return;
-    }
-
+  const performVerification = async (
+    student: any,
+    token: string | null,
+    method: "QR_SCAN" | "MANUAL_PIN",
+    pin: string = "000000",
+  ) => {
     setIsVerifying(true);
-
-    const action =
-      selectedStudent.status === "picked_up" ? "dropped_off" : "picked_up";
+    const action = student.status === "picked_up" ? "dropped_off" : "picked_up";
 
     try {
-      const token = localStorage.getItem("authToken");
-
-      // 2. Send the request
+      const authToken = localStorage.getItem("authToken");
       await axios.post(
-        `https://safe-track-8a62.onrender.com/api/drivers/students/${selectedStudent.id}/verify`,
+        `https://safe-track-8a62.onrender.com/api/drivers/students/${student.id}/verify`,
         {
-          // Send 000000 or null if QR was used, backend should handle this
-          pin: isQrVerify ? "000000" : pinInput,
-          scannedToken: scannedToken,
-          method: isQrVerify ? "QR_SCAN" : "MANUAL_PIN",
+          pin: pin,
+          scannedToken: token,
+          method: method,
           action,
           lat: van?.current_lat || null,
           lng: van?.current_lng || null,
         },
-        { headers: { Authorization: `Bearer ${token?.replace(/"/g, "")}` } },
+        {
+          headers: { Authorization: `Bearer ${authToken?.replace(/"/g, "")}` },
+        },
       );
 
-      // Haptic & Audio Feedback (Optional but professional)
+      // Success Actions
       if ("vibrate" in navigator) navigator.vibrate(200);
 
-      // Reset states
-      setScannedToken(null);
-      setShowVerifyModal(false);
+      setShowVerifyModal(false); // Close PIN modal if it was open
       setPinInput("");
-      fetchDashboardData(); // Refresh roster
+      setShowSuccess(true); // Show big green checkmark
 
-      // ... inside try block after the axios.post call
-      setShowVerifyModal(false); // Close the PIN/Scan modal
-      setShowSuccess(true); // Show the big green checkmark
-
-      // Auto-hide the success animation after 2 seconds
+      // Auto-refresh and hide success UI
       setTimeout(() => {
         setShowSuccess(false);
+        fetchDashboardData();
       }, 2000);
-
-      setScannedToken(null);
-      setPinInput("");
-      fetchDashboardData();
     } catch (err: any) {
       if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
       alert(err.response?.data?.message || "Verification failed");
     } finally {
       setIsVerifying(false);
     }
+  };
+
+  // 3. Updated Manual PIN Submission
+  const submitVerification = async () => {
+    if (!pinInput || pinInput.length < 6) {
+      alert("Please enter the 6-digit PIN.");
+      return;
+    }
+    // Call the shared function
+    await performVerification(selectedStudent, null, "MANUAL_PIN", pinInput);
   };
 
   const stats = {
