@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef, useEffect } from "react";
 import {
-  MapPin,
   ChevronRight,
-  Mail,
   Settings,
   Bell,
   Lock,
@@ -33,24 +31,36 @@ interface UserData {
   avatar_url?: string;
 }
 
+// 1. Move the map outside, but DO NOT try to use userRole here.
+const rolePathMap = {
+  SUPER_ADMIN: "admin",
+  SCHOOL_ADMIN: "school",
+  DRIVER: "driver",
+  PARENT: "parent",
+} as const;
+
 const ProfilePage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Hook called correctly inside the component
   const { userData, loading } = useUser() as unknown as {
     userData: UserData | null;
     loading: boolean;
   };
 
+  // 2. Calculate the base path INSIDE the component where userData exists.
+  // We use "DRIVER" as a safe fallback for the type check.
+  const userRole = (userData?.role as Role) || "DRIVER";
+  const basePath = `/${rolePathMap[userRole]}`;
+
   const [isUploading, setIsUploading] = useState(false);
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const [liveStats, setLiveStats] = useState({
     onboard: 0,
     waiting: 0,
     total: 0,
   });
 
-  // 2. Fetch live data for stats if the user is a driver
   useEffect(() => {
     const fetchStats = async () => {
       if (userData?.role === "DRIVER" && userData?.id) {
@@ -81,16 +91,12 @@ const ProfilePage = () => {
     fetchStats();
   }, [userData]);
 
-  /* ================= HANDLERS ================= */
-
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = "/login";
   };
 
   const handleAvatarClick = () => fileInputRef.current?.click();
-
-  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
 
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -120,7 +126,6 @@ const ProfilePage = () => {
           .eq("id", userData.id);
 
         if (error) throw error;
-
         setLocalAvatar(data.secure_url);
         alert("Success! Profile picture updated.");
       }
@@ -131,8 +136,6 @@ const ProfilePage = () => {
       setIsUploading(false);
     }
   };
-
-  /* ================= ROLE CONFIG ================= */
 
   const roleConfig: Record<Role, any> = {
     SUPER_ADMIN: {
@@ -175,9 +178,7 @@ const ProfilePage = () => {
     },
   };
 
-  const currentRole = userData?.role
-    ? roleConfig[userData.role as Role]
-    : roleConfig.DRIVER;
+  const currentRole = roleConfig[userRole];
 
   if (loading) {
     return (
@@ -235,15 +236,6 @@ const ProfilePage = () => {
                 {currentRole.label}
               </span>
             </div>
-
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4 pt-4 border-t border-slate-50 text-slate-500 text-sm">
-              <div className="flex items-center gap-2">
-                <Mail size={14} /> {userData?.email}
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin size={14} /> Kampala, UG
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -274,10 +266,18 @@ const ProfilePage = () => {
           {
             label: "Account Settings",
             icon: Settings,
-            path: "/accountsettings",
+            path: `${basePath}/accountsettings`,
           },
-          { label: "Privacy & Security", icon: Lock, path: "/security" },
-          { label: "Notifications", icon: Bell, path: "/notifications" },
+          {
+            label: "Privacy & Security",
+            icon: Lock,
+            path: `${basePath}/security`,
+          },
+          {
+            label: "Notifications",
+            icon: Bell,
+            path: `${basePath}/notifications`,
+          },
         ].map((item, idx) => (
           <button
             key={idx}

@@ -107,7 +107,8 @@ const DriverDashboard = () => {
   const startNativeScan = async () => {
     try {
       const status = await BarcodeScanner.checkPermissions();
-      if (status.camera !== "granted") await BarcodeScanner.requestPermissions();
+      if (status.camera !== "granted")
+        await BarcodeScanner.requestPermissions();
 
       document.body.classList.add("barcode-scanner-active");
       setIsScanning(true);
@@ -117,25 +118,28 @@ const DriverDashboard = () => {
 
       if (result?.barcodes?.length > 0) {
         // 1. Safely access the value. If it's missing, rawValue becomes undefined.
-const rawValue = result.barcodes?.[0]?.rawValue?.trim();
+        const rawValue = result.barcodes?.[0]?.rawValue?.trim();
 
-// 2. Add a guard clause to stop execution if the value is missing.
-if (!rawValue) {
-  console.log("No barcode data detected.");
-  await stopNativeScan();
-  return;
-}
+        // 2. Add a guard clause to stop execution if the value is missing.
+        if (!rawValue) {
+          console.log("No barcode data detected.");
+          await stopNativeScan();
+          return;
+        }
 
-// 3. Now TypeScript knows 'rawValue' is a string.
-console.log("SUCCESSFULLY SCANNED:", rawValue);
-        
+        // 3. Now TypeScript knows 'rawValue' is a string.
+        console.log("SUCCESSFULLY SCANNED:", rawValue);
+
         // --- NEW DEBUG LOGS START ---
         console.log("1. SCANNED VALUE:", rawValue);
         console.log("2. STUDENTS IN MEMORY:", students.length);
-        
+
         if (students.length > 0) {
-            console.log("3. KEYS IN STUDENT OBJECT:", Object.keys(students[0]));
-            console.log("4. FULL DATA FOR STUDENT[0]:", JSON.stringify(students[0]));
+          console.log("3. KEYS IN STUDENT OBJECT:", Object.keys(students[0]));
+          console.log(
+            "4. FULL DATA FOR STUDENT[0]:",
+            JSON.stringify(students[0]),
+          );
         }
         // --- NEW DEBUG LOGS END ---
 
@@ -150,7 +154,9 @@ console.log("SUCCESSFULLY SCANNED:", rawValue);
 
         if (student) {
           console.log("MATCH FOUND:", student.name);
-          setScannedToken(student.handover_token === rawValue ? rawValue : null);
+          setScannedToken(
+            student.handover_token === rawValue ? rawValue : null,
+          );
           setSelectedStudent(student);
           setShowVerifyModal(true);
         } else {
