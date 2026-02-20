@@ -21,6 +21,7 @@ const DriversPage = () => {
     fetchDrivers();
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filteredDrivers = drivers.filter((d: any) =>
     d.full_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -60,6 +61,7 @@ const DriversPage = () => {
             <div key={i} className="h-24 bg-white rounded-3xl animate-pulse border border-slate-100" />
           ))
         ) : filteredDrivers.length > 0 ? (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filteredDrivers.map((driver: any) => (
             <div key={driver.id} className="bg-white p-4 md:p-6 rounded-4xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-xl hover:border-blue-200 transition-all group">
               

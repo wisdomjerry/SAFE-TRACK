@@ -37,6 +37,7 @@ const DriverDashboard = () => {
   const [pinInput, setPinInput] = useState("");
   const [scannedToken, setScannedToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useGpsBroadcaster(van?.id, tripActive);
 
@@ -103,6 +104,7 @@ const DriverDashboard = () => {
   }, []);
 
   // NEW: Native Barcode Scanner Logic
+  // REWRITTEN: Native Barcode Scanner Logic with correct property access
   const startNativeScan = async () => {
     try {
       const status = await BarcodeScanner.checkPermissions();
@@ -110,19 +112,30 @@ const DriverDashboard = () => {
         await BarcodeScanner.requestPermissions();
       }
 
+      // 1. Prepare UI for scanning
       document.body.classList.add("barcode-scanner-active");
       setIsScanning(true);
 
       const result = await BarcodeScanner.scan();
 
-      if (result.barcodes && result.barcodes.length > 0) {
-        // Use .trim() to remove accidental whitespace from the scan
-        const rawValue = result.barcodes[0].displayValue.trim();
+      // 2. CRITICAL FIX: Check if barcodes array exists and has at least one item
+      if (result && result.barcodes && result.barcodes.length > 0) {
+        // Use rawValue for UUIDs and tokens; displayValue is usually for text
+        // 1. Safely access the value. If it's missing, rawValue becomes undefined.
+        const rawValue = result.barcodes?.[0]?.rawValue?.trim();
 
-        // LOGIC: Search your local roster
+        // 2. Add a guard clause to stop execution if the value is missing.
+        if (!rawValue) {
+          console.log("No barcode data detected.");
+          await stopNativeScan();
+          return;
+        }
+
+        // 3. Now TypeScript knows 'rawValue' is a string.
+        console.log("SUCCESSFULLY SCANNED:", rawValue);
+
+        // 3. Search local roster for a match
         const student = students.find((s) => {
-          // Match against Token (if it exists) OR the UUID (id)
-          // We use lowercase comparison to be 100% safe with UUIDs
           return (
             (s.handover_token && s.handover_token === rawValue) ||
             (s.id && s.id.toLowerCase() === rawValue.toLowerCase())
@@ -130,20 +143,28 @@ const DriverDashboard = () => {
         });
 
         if (student) {
-          // If it matched the token, store it. If it matched the ID, scannedToken stays null.
+          // If match found, set the states and proceed to modal
           const isTokenMatch = student.handover_token === rawValue;
           setScannedToken(isTokenMatch ? rawValue : null);
-
           setSelectedStudent(student);
-          setShowVerifyModal(true);
-        } else {
-          // Debugging help: tells you what it actually saw vs what it was looking for
-          console.error("No match for scanned value:", rawValue);
-          alert(`Invalid Student ID: ${rawValue.substring(0, 8)}...`);
-        }
-      }
 
-      await stopNativeScan();
+          // Close scanner UI before showing verification modal
+          await stopNativeScan();
+          setShowVerifyModal(true);
+
+          // OPTIONAL: Automatically submit if it's a QR scan (bypass PIN)
+          // If your backend allows QR-only verification:
+          // submitVerification(student, rawValue);
+        } else {
+          console.error("No student found with ID/Token:", rawValue);
+          alert(`Invalid QR Code: ${rawValue.substring(0, 8)}...`);
+          await stopNativeScan();
+        }
+      } else {
+        // User likely hit the back button or closed the scanner
+        console.log("Scanner closed without result");
+        await stopNativeScan();
+      }
     } catch (error) {
       console.error("Scanner error:", error);
       await stopNativeScan();
@@ -179,8 +200,14 @@ const DriverDashboard = () => {
   };
 
   const submitVerification = async () => {
-    // UPDATED: Now requires 6 digits
-    if (!pinInput || pinInput.length < 6) return;
+    // 1. Check: If no QR was scanned, we MUST have a 6-digit PIN.
+    // If a QR was scanned, we allow the PIN to be empty.
+    const isQrVerify = !!scannedToken;
+    if (!isQrVerify && (!pinInput || pinInput.length < 6)) {
+      alert("Please enter the 6-digit PIN or scan the QR code.");
+      return;
+    }
+
     setIsVerifying(true);
 
     const action =
@@ -188,12 +215,15 @@ const DriverDashboard = () => {
 
     try {
       const token = localStorage.getItem("authToken");
+
+      // 2. Send the request
       await axios.post(
         `https://safe-track-8a62.onrender.com/api/drivers/students/${selectedStudent.id}/verify`,
         {
-          pin: pinInput,
+          // Send 000000 or null if QR was used, backend should handle this
+          pin: isQrVerify ? "000000" : pinInput,
           scannedToken: scannedToken,
-          method: scannedToken ? "QR_SCAN" : "MANUAL_PIN",
+          method: isQrVerify ? "QR_SCAN" : "MANUAL_PIN",
           action,
           lat: van?.current_lat || null,
           lng: van?.current_lng || null,
@@ -201,28 +231,25 @@ const DriverDashboard = () => {
         { headers: { Authorization: `Bearer ${token?.replace(/"/g, "")}` } },
       );
 
-      if ("vibrate" in navigator) {
-        navigator.vibrate(200);
-      }
+      // Haptic & Audio Feedback (Optional but professional)
+      if ("vibrate" in navigator) navigator.vibrate(200);
 
-      const AudioContextClass =
-        (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) {
-        const audioCtx = new AudioContextClass();
-        if (audioCtx.state === "suspended") await audioCtx.resume();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.type = "sine";
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.2);
-      }
-
+      // Reset states
       setScannedToken(null);
       setShowVerifyModal(false);
+      setPinInput("");
+      fetchDashboardData(); // Refresh roster
+
+      // ... inside try block after the axios.post call
+      setShowVerifyModal(false); // Close the PIN/Scan modal
+      setShowSuccess(true); // Show the big green checkmark
+
+      // Auto-hide the success animation after 2 seconds
+      setTimeout(() => {
+        setShowSuccess(false);
+      }, 2000);
+
+      setScannedToken(null);
       setPinInput("");
       fetchDashboardData();
     } catch (err: any) {
@@ -366,10 +393,6 @@ const DriverDashboard = () => {
           className={`${theme.card} rounded-[2.5rem] p-2 border ${theme.border} overflow-hidden shadow-lg`}
         >
           <div className="relative h-96 w-full rounded-[2.2rem] bg-slate-800 overflow-hidden border border-white/5">
-            {/* PRIORITY: Use van coordinates from the database, 
-      but ensure your useGpsBroadcaster hook is actually 
-      firing to keep these coordinates fresh! 
-    */}
             {van?.current_lat && van?.current_lng ? (
               <MapContainer
                 // Use key to force map to re-mount if van ID changes,
@@ -581,7 +604,9 @@ const DriverDashboard = () => {
 
                 <button
                   onClick={submitVerification}
-                  disabled={pinInput.length < 6 || isVerifying} // Required length is now 6
+                  disabled={
+                    (!scannedToken && pinInput.length < 6) || isVerifying
+                  }
                   className={`w-full py-5 rounded-4xl font-black text-lg transition-all ${pinInput.length === 6 ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30" : "bg-slate-800 text-slate-600"}`}
                 >
                   {isVerifying ? (
@@ -602,6 +627,26 @@ const DriverDashboard = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* SUCCESS ANIMATION OVERLAY */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-10000 flex items-center justify-center bg-emerald-500/90 backdrop-blur-xl animate-in fade-in zoom-in duration-300">
+          <div className="text-center space-y-4">
+            <div className="bg-white rounded-full p-6 inline-block shadow-2xl animate-bounce">
+              <CheckCircle2
+                size={80}
+                className="text-emerald-500"
+                strokeWidth={3}
+              />
+            </div>
+            <h2 className="text-4xl font-black text-white uppercase tracking-tighter">
+              Verified
+            </h2>
+            <p className="text-white/80 font-bold uppercase tracking-widest text-sm">
+              Student Status Updated
+            </p>
           </div>
         </div>
       )}
