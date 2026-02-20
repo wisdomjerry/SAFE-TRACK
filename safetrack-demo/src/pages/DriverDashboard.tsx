@@ -103,7 +103,6 @@ const DriverDashboard = () => {
     );
   }, []);
 
-  // NEW: Native Barcode Scanner Logic
   // REWRITTEN: Native Barcode Scanner Logic with correct property access
   const startNativeScan = async () => {
     try {
@@ -112,15 +111,15 @@ const DriverDashboard = () => {
         await BarcodeScanner.requestPermissions();
       }
 
-      // 1. Prepare UI for scanning
       document.body.classList.add("barcode-scanner-active");
       setIsScanning(true);
 
       const result = await BarcodeScanner.scan();
 
-      // 2. CRITICAL FIX: Check if barcodes array exists and has at least one item
+      // Cleanup UI
+      await stopNativeScan();
+
       if (result && result.barcodes && result.barcodes.length > 0) {
-        // Use rawValue for UUIDs and tokens; displayValue is usually for text
         // 1. Safely access the value. If it's missing, rawValue becomes undefined.
         const rawValue = result.barcodes?.[0]?.rawValue?.trim();
 
@@ -134,36 +133,43 @@ const DriverDashboard = () => {
         // 3. Now TypeScript knows 'rawValue' is a string.
         console.log("SUCCESSFULLY SCANNED:", rawValue);
 
-        // 3. Search local roster for a match
+        console.log("--- SCAN DEBUG START ---");
+        console.log("SCANNED VALUE:", `"${rawValue}"`);
+        console.log("TOTAL STUDENTS IN ROSTER:", students.length);
+
+        // 1. Log the first student to see the exact object keys
+        if (students.length > 0) {
+          console.log("SAMPLE STUDENT OBJECT:", JSON.stringify(students[0]));
+        }
+
+        // 2. Perform the search with internal logging
         const student = students.find((s) => {
-          return (
-            (s.handover_token && s.handover_token === rawValue) ||
-            (s.id && s.id.toLowerCase() === rawValue.toLowerCase())
-          );
+          const isTokenMatch = s.handover_token === rawValue;
+          const isIdMatch =
+            s.id?.toString().toLowerCase() === rawValue.toLowerCase();
+
+          if (isTokenMatch || isIdMatch) {
+            console.log(
+              "MATCH FOUND:",
+              s.name,
+              "via",
+              isTokenMatch ? "Token" : "ID",
+            );
+          }
+          return isTokenMatch || isIdMatch;
         });
 
         if (student) {
-          // If match found, set the states and proceed to modal
           const isTokenMatch = student.handover_token === rawValue;
           setScannedToken(isTokenMatch ? rawValue : null);
           setSelectedStudent(student);
-
-          // Close scanner UI before showing verification modal
-          await stopNativeScan();
+          setPinInput("");
           setShowVerifyModal(true);
-
-          // OPTIONAL: Automatically submit if it's a QR scan (bypass PIN)
-          // If your backend allows QR-only verification:
-          // submitVerification(student, rawValue);
         } else {
-          console.error("No student found with ID/Token:", rawValue);
-          alert(`Invalid QR Code: ${rawValue.substring(0, 8)}...`);
-          await stopNativeScan();
+          console.error("MATCH FAIL: No student found with that value.");
+          alert(`Student not found. Scanned: ${rawValue.substring(0, 8)}...`);
         }
-      } else {
-        // User likely hit the back button or closed the scanner
-        console.log("Scanner closed without result");
-        await stopNativeScan();
+        console.log("--- SCAN DEBUG END ---");
       }
     } catch (error) {
       console.error("Scanner error:", error);
