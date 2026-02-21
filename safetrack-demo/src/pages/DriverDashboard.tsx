@@ -114,7 +114,7 @@ const DriverDashboard = () => {
       setIsScanning(true);
 
       const result = await BarcodeScanner.scan();
-      await stopNativeScan(); // Hide camera overlay
+      await stopNativeScan();
 
       if (result?.barcodes?.length > 0) {
         const rawValue = result.barcodes?.[0]?.rawValue?.trim();
@@ -131,8 +131,13 @@ const DriverDashboard = () => {
 
         if (student) {
           console.log("MATCH FOUND, AUTO-VERIFYING:", student.name);
-          // We pass data directly to avoid waiting for React state updates
-          await performVerification(student, student.handover_token, "QR_SCAN");
+          // FIX: Pass the student's real PIN from the object so the backend is happy
+          await performVerification(
+            student,
+            rawValue,
+            "QR_SCAN",
+            student.handover_pin,
+          );
         } else {
           alert(`Student not found in your current trip roster.`);
         }
@@ -181,11 +186,14 @@ const DriverDashboard = () => {
     const action = student.status === "picked_up" ? "dropped_off" : "picked_up";
 
     try {
-      const authToken = localStorage.getItem("authToken");
+      // FIX 401: Robust token cleaning
+      const rawAuthToken = localStorage.getItem("authToken") || "";
+      const cleanAuthToken = rawAuthToken.replace(/"/g, "");
+
       await axios.post(
         `https://safe-track-8a62.onrender.com/api/drivers/students/${student.id}/verify`,
         {
-          pin: pin,
+          pin: pin, // Uses student.handover_pin if from QR, or pinInput if manual
           scannedToken: token,
           method: method,
           action,
@@ -193,16 +201,16 @@ const DriverDashboard = () => {
           lng: van?.current_lng || null,
         },
         {
-          headers: { Authorization: `Bearer ${authToken?.replace(/"/g, "")}` },
+          headers: { Authorization: `Bearer ${cleanAuthToken}` },
         },
       );
 
       // Success Actions
       if ("vibrate" in navigator) navigator.vibrate(200);
 
-      setShowVerifyModal(false); // Close PIN modal if it was open
+      setShowVerifyModal(false);
       setPinInput("");
-      setShowSuccess(true); // Show big green checkmark
+      setShowSuccess(true);
 
       // Auto-refresh and hide success UI
       setTimeout(() => {
@@ -210,8 +218,12 @@ const DriverDashboard = () => {
         fetchDashboardData();
       }, 2000);
     } catch (err: any) {
+      console.error("API ERROR:", err.response?.data);
       if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
-      alert(err.response?.data?.message || "Verification failed");
+
+      // Better error feedback
+      const msg = err.response?.data?.message || "Verification failed";
+      alert(`Error: ${msg}`);
     } finally {
       setIsVerifying(false);
     }
