@@ -136,7 +136,7 @@ const DriverDashboard = () => {
             student,
             rawValue,
             "QR_SCAN",
-            student.handover_pin,
+            null // No PIN sent for QR scans
           );
         } else {
           alert(`Student not found in your current trip roster.`);
@@ -177,57 +177,68 @@ const DriverDashboard = () => {
   };
 
   const performVerification = async (
-    student: any,
-    token: string | null,
-    method: "QR_SCAN" | "MANUAL_PIN",
-    pin: string = "000000",
-  ) => {
-    setIsVerifying(true);
-    const action = student.status === "picked_up" ? "dropped_off" : "picked_up";
+  student: any,
+  token: string | null,
+  method: "QR_SCAN" | "MANUAL_PIN",
+  pin: string | null = null, // Changed default to null
+) => {
+  setIsVerifying(true);
+  const action = student.status === "picked_up" ? "dropped_off" : "picked_up";
 
-    try {
-      // FIX 401: Robust token cleaning
-      const rawAuthToken = localStorage.getItem("authToken") || "";
-      const cleanAuthToken = rawAuthToken.replace(/"/g, "");
+  try {
+    // FIX 401: Proper token extraction
+    const rawAuthToken = localStorage.getItem("authToken") || "";
+    const cleanAuthToken = rawAuthToken.replace(/[\\"]/g, "").trim(); // Removes quotes and backslashes
 
-      await axios.post(
-        `https://safe-track-8a62.onrender.com/api/drivers/students/${student.id}/verify`,
-        {
-          pin: pin, // Uses student.handover_pin if from QR, or pinInput if manual
-          scannedToken: token,
-          method: method,
-          action,
-          lat: van?.current_lat || null,
-          lng: van?.current_lng || null,
-        },
-        {
-          headers: { Authorization: `Bearer ${cleanAuthToken}` },
-        },
-      );
+    // STANDALONE PAYLOAD: Only send pin if it's manual, only send token if it's QR
+    const payload: any = {
+      method: method,
+      action: action,
+      lat: van?.current_lat || null,
+      lng: van?.current_lng || null,
+    };
 
-      // Success Actions
-      if ("vibrate" in navigator) navigator.vibrate(200);
-
-      setShowVerifyModal(false);
-      setPinInput("");
-      setShowSuccess(true);
-
-      // Auto-refresh and hide success UI
-      setTimeout(() => {
-        setShowSuccess(false);
-        fetchDashboardData();
-      }, 2000);
-    } catch (err: any) {
-      console.error("API ERROR:", err.response?.data);
-      if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
-
-      // Better error feedback
-      const msg = err.response?.data?.message || "Verification failed";
-      alert(`Error: ${msg}`);
-    } finally {
-      setIsVerifying(false);
+    if (method === "QR_SCAN") {
+      payload.scannedToken = token;
+    } else {
+      payload.pin = pin;
     }
-  };
+
+    await axios.post(
+      `https://safe-track-8a62.onrender.com/api/drivers/students/${student.id}/verify`,
+      payload,
+      {
+        headers: { 
+          Authorization: `Bearer ${cleanAuthToken}`,
+          'Content-Type': 'application/json'
+        },
+      }
+    );
+
+    if ("vibrate" in navigator) navigator.vibrate(200);
+
+    setShowVerifyModal(false);
+    setPinInput("");
+    setShowSuccess(true);
+
+    setTimeout(() => {
+      setShowSuccess(false);
+      fetchDashboardData();
+    }, 2000);
+
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "Verification failed";
+    console.error("API ERROR:", errorMsg);
+    
+    if (err.response?.status === 401) {
+      alert("Session Error: Please log out and back in.");
+    } else {
+      alert(errorMsg);
+    }
+  } finally {
+    setIsVerifying(false);
+  }
+};
 
   // 3. Updated Manual PIN Submission
   const submitVerification = async () => {

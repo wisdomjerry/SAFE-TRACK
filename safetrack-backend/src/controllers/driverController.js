@@ -85,34 +85,37 @@ async function verifyStudentHandover(req, res) {
   const { studentId } = req.params;
   const { pin, method, action, lat, lng, scannedToken } = req.body;
 
-  console.log(`--- 🚀 START VERIFICATION: ${studentId} ---`);
-
   try {
-    // 1️⃣ Fetch student record - MUST include handover_token
     const { data: student, error: fetchError } = await supabase
-  .from("students")
-  .select("id, name, guardian_pin, handover_token, assigned_van_id, status, school_id") // Added school_id
-  .eq("id", studentId)
-  .single();
+      .from("students")
+      .select("id, name, guardian_pin, handover_token, assigned_van_id, status, school_id")
+      .eq("id", studentId)
+      .single();
 
     if (fetchError || !student) {
       return res.status(404).json({ success: false, message: "Student not found" });
     }
 
-    // 2️⃣ SECURITY: QR Token Check
+    // --- STANDALONE LOGIC START ---
+    
     if (method === "QR_SCAN") {
-      if (student.handover_token !== scannedToken) {
-        console.warn(`🚨 SECURITY ALERT: Token mismatch for ${student.name}`);
-        return res.status(403).json({ success: false, message: "Invalid or expired QR Code" });
+      // If QR matches, we skip the PIN check entirely
+      if (student.handover_token === scannedToken) {
+        console.log(`✅ QR Match for ${student.name}`);
+      } else {
+        return res.status(403).json({ success: false, message: "Invalid QR Code" });
       }
+    } else {
+      // If MANUAL_PIN, we check the PIN
+      const dbPin = String(student.guardian_pin).trim();
+      const inputPin = String(pin || "").trim();
+      if (dbPin !== inputPin) {
+        return res.status(401).json({ success: false, message: "Incorrect Security PIN" });
+      }
+      console.log(`✅ PIN Match for ${student.name}`);
     }
 
-    // 3️⃣ SECURITY: PIN check
-    const dbPin = String(student.guardian_pin).trim();
-    const inputPin = String(pin || "").trim();
-    if (dbPin !== inputPin) {
-      return res.status(401).json({ success: false, message: "Incorrect Security PIN" });
-    }
+    // --- STANDALONE LOGIC END ---
 
     // 4️⃣ Update student status
     const isPickup = action === "picked_up";
@@ -127,12 +130,12 @@ async function verifyStudentHandover(req, res) {
 
     if (updateError) throw updateError;
 
-    // 5️⃣ Insert audit log
+    // 5️⃣ Audit Log
     await supabase.from("pickup_logs").insert({
       student_id: studentId,
-      driver_id: req.user.id,
+      driver_id: req.user.id, // Ensure this is coming from your auth middleware
       van_id: student.assigned_van_id,
-      school_id: student.school_id, // Added this since your table has it
+      school_id: student.school_id,
       verification_hash: method,
       latitude: lat || null,
       longitude: lng || null,
@@ -140,11 +143,9 @@ async function verifyStudentHandover(req, res) {
       scanned_at: new Date().toISOString()
     });
 
-    console.log(`--- ✨ VERIFICATION COMPLETE for ${student.name} ---`);
     res.status(200).json({ success: true, message: "Verification successful" });
 
   } catch (err) {
-    console.error("💥 Verification Error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 }
