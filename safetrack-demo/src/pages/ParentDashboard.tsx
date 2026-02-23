@@ -31,8 +31,8 @@ interface Child {
   heading: number;
   driver_name?: string;
   driver_phone?: string;
-  home_lat?: number; // Added to interface
-  home_lng?: number; // Added to interface
+  home_lat?: number;
+  home_lng?: number;
 }
 
 interface LogEntry {
@@ -44,7 +44,7 @@ interface LogEntry {
 
 // Helper to calculate distance in KM
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; 
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -72,6 +72,9 @@ const ParentDashboard = () => {
 
   const prevIsOnBusRef = useRef<boolean | null>(null);
 
+  // SAFE DEFINITION: This prevents the "Cannot read properties of undefined" error
+  const activeChild = children.length > 0 ? children[0] : null;
+
   const theme = {
     bg: isDarkMode ? "bg-[#0F0F10]" : "bg-[#F4F7FA]",
     card: isDarkMode ? "bg-[#1C1C1E]" : "bg-white",
@@ -79,27 +82,6 @@ const ParentDashboard = () => {
     textSub: isDarkMode ? "text-slate-400" : "text-slate-500",
     border: isDarkMode ? "border-white/5" : "border-slate-100",
     inner: isDarkMode ? "bg-white/5" : "bg-slate-50",
-  };
-
-  const activeChild = children[0];
-
-  // --- UPDATE HOME LOCATION ---
-  const updateHomeLocation = () => {
-    if (!activeChild) return;
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { latitude, longitude } = pos.coords;
-      try {
-        await axios.patch(`/api/parents/students/${activeChild.id}/home-location`, {
-          home_lat: latitude,
-          home_lng: longitude,
-        });
-        setShowToast({ show: true, msg: "📍 Home location updated!" });
-        setTimeout(() => setShowToast({ show: false, msg: "" }), 3000);
-        loadData();
-      } catch (err) {
-        console.error("Failed to save home location", err);
-      }
-    });
   };
 
   // --- DATA LOADING ---
@@ -142,8 +124,28 @@ const ParentDashboard = () => {
     }
   }, []);
 
+  // --- UPDATE HOME LOCATION ---
+  const updateHomeLocation = () => {
+    if (!activeChild) return;
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      try {
+        await axios.patch(`/api/parents/students/${activeChild.id}/home-location`, {
+          home_lat: latitude,
+          home_lng: longitude,
+        });
+        setShowToast({ show: true, msg: "📍 Home location updated!" });
+        setTimeout(() => setShowToast({ show: false, msg: "" }), 3000);
+        loadData();
+      } catch (err) {
+        console.error("Failed to save home location", err);
+      }
+    });
+  };
+
   // --- GEOFENCE MONITOR ---
   useEffect(() => {
+    // SAFE GUARD: Don't run logic if activeChild hasn't loaded yet
     if (!activeChild || hasNotifiedProximity || !activeChild.is_on_bus) return;
 
     const destLat = activeChild.home_lat || 0.3476;
@@ -156,7 +158,7 @@ const ParentDashboard = () => {
       setHasNotifiedProximity(true);
       if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
     }
-  }, [activeChild.lat, activeChild.lng, activeChild.is_on_bus, hasNotifiedProximity, activeChild]);
+  }, [activeChild?.lat, activeChild?.lng, activeChild?.is_on_bus, hasNotifiedProximity, activeChild]);
 
   useEffect(() => {
     loadData();
@@ -218,7 +220,7 @@ const ParentDashboard = () => {
             setTimeout(() => setShowToast({ show: false, msg: "" }), 5000);
             if (hasBoarded) {
                 autoRotatePin(updatedFields.id);
-                setHasNotifiedProximity(false); // Reset for drop-off
+                setHasNotifiedProximity(false); 
             }
             setTimeout(loadData, 1000);
           }
@@ -237,7 +239,7 @@ const ParentDashboard = () => {
     };
   }, [children.length, loadData]);
 
-  if (loading)
+  if (loading || !activeChild)
     return (
       <div className={`h-screen flex items-center justify-center ${theme.bg} font-black text-blue-600 animate-pulse`}>
         Safetrack Live...
@@ -307,7 +309,7 @@ const ParentDashboard = () => {
               <LiveMap lat={activeChild.lat} lng={activeChild.lng} isOnBus={activeChild.is_on_bus} routePath={routePath} heading={activeChild.heading} />
             </div>
             <button 
-                onClick={() => window.open(`http://maps.google.com/?q=${activeChild.lat},${activeChild.lng}`, '_blank')}
+                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${activeChild.lat},${activeChild.lng}`, '_blank')}
                 className="absolute bottom-20 right-6 bg-white p-3 rounded-full shadow-lg text-blue-600 active:scale-90"
             >
                 <Navigation size={20} fill="currentColor" />
@@ -335,7 +337,6 @@ const ParentDashboard = () => {
   );
 };
 
-// --- SUB-COMPONENTS ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const HistorySection = ({ title, theme, items, isDropoff }: any) => (
   <section>
