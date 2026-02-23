@@ -12,13 +12,13 @@ import {
   Phone,
   Camera,
   Loader2,
+  Navigation,
 } from "lucide-react";
 import axios from "axios";
 import { useGpsBroadcaster } from "../hooks/useGpsBroadcaster";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-// Removed BrowserMultiFormatReader as we are using native MLKit
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
 const DriverDashboard = () => {
@@ -30,12 +30,11 @@ const DriverDashboard = () => {
   const [driverInfo, setDriverInfo] = useState<any>(null);
   const wakeLock = useRef<any>(null);
 
-  // NEW: Verification States
   const [isScanning, setIsScanning] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [pinInput, setPinInput] = useState("");
-  const [scannedToken, setScannedToken] = useState<string | null>(null);
+  const [, setScannedToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -47,11 +46,7 @@ const DriverDashboard = () => {
       const name = localStorage.getItem("userName");
       const role = localStorage.getItem("userRole");
 
-      setDriverInfo({
-        full_name: name,
-        role: role,
-      });
-
+      setDriverInfo({ full_name: name, role: role });
       if (!token) return;
 
       const response = await axios.get(
@@ -62,9 +57,6 @@ const DriverDashboard = () => {
       if (response.data.success) {
         setVan(response.data.van);
         setStudents(response.data.students);
-
-        // Removed .catch() because state updates are synchronous
-        // and don't return a promise.
         setDriverInfo((prev: any) => ({
           ...prev,
           phone_number: response.data.van?.driver_phone || prev.phone_number,
@@ -88,62 +80,38 @@ const DriverDashboard = () => {
     return () => clearInterval(interval);
   }, [tripActive, fetchDashboardData]);
 
-  // Add this near your other useEffects
   useEffect(() => {
-    // Get immediate location on load so the map isn't "stuck" in the past
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const { latitude, longitude } = position.coords;
-        // If we don't have van data yet, or it's old,
-        // we can use this to center the map initially
-        console.log("Initial GPS Lock:", latitude, longitude);
+        console.log("Initial GPS Lock:", position.coords.latitude);
       },
-      (error) => console.error("Initial GPS Error:", error),
+      (error) => console.error(error),
       { enableHighAccuracy: true },
     );
   }, []);
 
-  // REWRITTEN: Native Barcode Scanner Logic with correct property access
   const startNativeScan = async () => {
     try {
       const status = await BarcodeScanner.checkPermissions();
       if (status.camera !== "granted")
         await BarcodeScanner.requestPermissions();
-
       document.body.classList.add("barcode-scanner-active");
       setIsScanning(true);
-
       const result = await BarcodeScanner.scan();
       await stopNativeScan();
-
       if (result?.barcodes?.length > 0) {
         const rawValue = result.barcodes?.[0]?.rawValue?.trim();
         if (!rawValue) return;
-
-        console.log("SUCCESSFULLY SCANNED:", rawValue);
-
         const student = students.find(
-          (s) =>
-            s.handover_token === rawValue ||
-            s.id?.toString() === rawValue ||
-            s.student_id?.toString() === rawValue,
+          (s) => s.handover_token === rawValue || s.id?.toString() === rawValue,
         );
-
         if (student) {
-          console.log("MATCH FOUND, AUTO-VERIFYING:", student.name);
-          // FIX: Pass the student's real PIN from the object so the backend is happy
-          await performVerification(
-            student,
-            rawValue,
-            "QR_SCAN",
-            null // No PIN sent for QR scans
-          );
+          await performVerification(student, rawValue, "QR_SCAN", null);
         } else {
-          alert(`Student not found in your current trip roster.`);
+          alert(`Student not found.`);
         }
       }
     } catch (error) {
-      console.error("SCAN ERROR:", error);
       await stopNativeScan();
     }
   };
@@ -177,76 +145,52 @@ const DriverDashboard = () => {
   };
 
   const performVerification = async (
-  student: any,
-  token: string | null,
-  method: "QR_SCAN" | "MANUAL_PIN",
-  pin: string | null = null, // Changed default to null
-) => {
-  setIsVerifying(true);
-  const action = student.status === "picked_up" ? "dropped_off" : "picked_up";
+    student: any,
+    token: string | null,
+    method: "QR_SCAN" | "MANUAL_PIN",
+    pin: string | null = null,
+  ) => {
+    setIsVerifying(true);
+    const action = student.status === "picked_up" ? "dropped_off" : "picked_up";
+    try {
+      const rawAuthToken = localStorage.getItem("authToken") || "";
+      const cleanAuthToken = rawAuthToken.replace(/[\\"]/g, "").trim();
+      const payload: any = {
+        method,
+        action,
+        lat: van?.current_lat || null,
+        lng: van?.current_lng || null,
+      };
+      if (method === "QR_SCAN") payload.scannedToken = token;
+      else payload.pin = pin;
 
-  try {
-    // FIX 401: Proper token extraction
-    const rawAuthToken = localStorage.getItem("authToken") || "";
-    const cleanAuthToken = rawAuthToken.replace(/[\\"]/g, "").trim(); // Removes quotes and backslashes
-
-    // STANDALONE PAYLOAD: Only send pin if it's manual, only send token if it's QR
-    const payload: any = {
-      method: method,
-      action: action,
-      lat: van?.current_lat || null,
-      lng: van?.current_lng || null,
-    };
-
-    if (method === "QR_SCAN") {
-      payload.scannedToken = token;
-    } else {
-      payload.pin = pin;
-    }
-
-    await axios.post(
-      `https://safe-track-8a62.onrender.com/api/drivers/students/${student.id}/verify`,
-      payload,
-      {
-        headers: { 
-          Authorization: `Bearer ${cleanAuthToken}`,
-          'Content-Type': 'application/json'
+      await axios.post(
+        `https://safe-track-8a62.onrender.com/api/drivers/students/${student.id}/verify`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${cleanAuthToken}`,
+            "Content-Type": "application/json",
+          },
         },
-      }
-    );
+      );
 
-    if ("vibrate" in navigator) navigator.vibrate(200);
-
-    setShowVerifyModal(false);
-    setPinInput("");
-    setShowSuccess(true);
-
-    setTimeout(() => {
-      setShowSuccess(false);
-      fetchDashboardData();
-    }, 2000);
-
-  } catch (err: any) {
-    const errorMsg = err.response?.data?.message || "Verification failed";
-    console.error("API ERROR:", errorMsg);
-    
-    if (err.response?.status === 401) {
-      alert("Session Error: Please log out and back in.");
-    } else {
-      alert(errorMsg);
+      if ("vibrate" in navigator) navigator.vibrate(200);
+      setShowVerifyModal(false);
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        fetchDashboardData();
+      }, 2500);
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Verification failed");
+    } finally {
+      setIsVerifying(false);
     }
-  } finally {
-    setIsVerifying(false);
-  }
-};
+  };
 
-  // 3. Updated Manual PIN Submission
   const submitVerification = async () => {
-    if (!pinInput || pinInput.length < 6) {
-      alert("Please enter the 6-digit PIN.");
-      return;
-    }
-    // Call the shared function
+    if (!pinInput || pinInput.length < 6) return;
     await performVerification(selectedStudent, null, "MANUAL_PIN", pinInput);
   };
 
@@ -268,22 +212,23 @@ const DriverDashboard = () => {
     accent: "bg-blue-600",
   };
 
-  const icon = L.divIcon({
+  const vanIcon = L.divIcon({
     className: "custom-icon",
     html: `<div class="relative flex items-center justify-center">
-          <div class="absolute w-12 h-12 bg-blue-500 rounded-full animate-ping opacity-20"></div>
-          <div class="relative bg-blue-600 p-2 rounded-full border-2 border-white shadow-xl text-white">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+          <div class="absolute w-12 h-12 bg-blue-500 rounded-full animate-ping opacity-40"></div>
+          <div class="absolute w-8 h-8 bg-blue-400 rounded-full animate-pulse opacity-20"></div>
+          <div class="relative bg-blue-600 p-2.5 rounded-full border-4 border-white shadow-2xl text-white">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
           </div>
         </div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
   });
 
   function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
     const map = useMap();
     useEffect(() => {
-      map.setView([lat, lng], map.getZoom());
+      map.setView([lat, lng], 17);
     }, [lat, lng, map]);
     return null;
   }
@@ -302,7 +247,9 @@ const DriverDashboard = () => {
       className={`min-h-screen ${theme.bg} ${theme.textMain} transition-colors duration-300 pb-24`}
     >
       <header className="px-6 pt-12 pb-4 flex justify-between items-center">
-        <h2 className="text-xl font-black tracking-tight">Trip Details</h2>
+        <h2 className="text-xl font-black tracking-tight uppercase italic">
+          SafeTrack <span className="text-blue-600">Pro</span>
+        </h2>
         <button
           onClick={() => setIsDarkMode(!isDarkMode)}
           className={`p-2 rounded-xl ${theme.card} border ${theme.border} shadow-sm`}
@@ -316,9 +263,9 @@ const DriverDashboard = () => {
       </header>
 
       <div className="px-5 space-y-6">
-        {/* Driver Card Section */}
+        {/* Driver Card */}
         <section
-          className={`${theme.card} rounded-4xl p-6 border ${theme.border} shadow-xl`}
+          className={`${theme.card} rounded-[2.5rem] p-6 border ${theme.border} shadow-xl`}
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
@@ -328,42 +275,37 @@ const DriverDashboard = () => {
                     driverInfo?.photo_url ||
                     "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"
                   }
-                  className="w-14 h-14 rounded-2xl object-cover"
+                  className="w-14 h-14 rounded-2xl object-cover border-2 border-blue-600/20"
                   alt="Driver"
                 />
                 <div
-                  className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-[#1C1C1E] rounded-full ${tripActive ? "bg-emerald-500 animate-pulse" : "bg-slate-500"}`}
+                  className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 ${isDarkMode ? "border-[#1C1C1E]" : "border-white"} rounded-full ${tripActive ? "bg-emerald-500 animate-pulse" : "bg-slate-500"}`}
                 />
               </div>
               <div>
                 <h3 className="font-black text-lg leading-tight">
-                  {driverInfo?.full_name || "Driver Name"}
+                  {driverInfo?.full_name}
                 </h3>
-                <p className={`text-xs ${theme.textSub} font-bold mt-0.5`}>
-                  {driverInfo?.phone_number || "No Phone linked"}
-                </p>
                 <p
-                  className={`text-[10px] ${theme.textSub} font-medium opacity-70 uppercase tracking-tighter mt-1`}
+                  className={`text-[10px] ${theme.textSub} font-bold uppercase tracking-widest`}
                 >
-                  Bus {van?.plate_number || "N/A"} • Route #{" "}
-                  {van?.id?.slice(0, 3) || "---"}
+                  {van?.plate_number} • Route {van?.id?.slice(0, 4)}
                 </p>
               </div>
             </div>
             <span
-              className={`${tripActive ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-500/10 text-slate-500"} text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest`}
+              className={`${tripActive ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-500/10 text-slate-500"} text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-current/20`}
             >
-              {tripActive ? "Active" : "Idle"}
+              {tripActive ? "Live" : "Idle"}
             </span>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={toggleTrip}
-              className={`flex items-center justify-center gap-2 ${tripActive ? "bg-rose-600" : "bg-blue-600"} text-white py-4 rounded-2xl font-black transition-transform active:scale-95 shadow-lg`}
+              className={`flex items-center justify-center gap-2 ${tripActive ? "bg-rose-600" : "bg-blue-600"} text-white py-4 rounded-2xl font-black transition-all active:scale-95 shadow-lg shadow-blue-900/20`}
             >
               {tripActive ? (
-                "Stop Trip"
+                "End Trip"
               ) : (
                 <>
                   <Play size={18} fill="currentColor" /> Start Trip
@@ -371,59 +313,58 @@ const DriverDashboard = () => {
               )}
             </button>
             <button
-              className={`flex items-center justify-center gap-2 ${isDarkMode ? "bg-white/5" : "bg-slate-100"} py-4 rounded-2xl font-black text-amber-500`}
+              className={`flex items-center justify-center gap-2 ${isDarkMode ? "bg-white/5" : "bg-slate-100"} py-4 rounded-2xl font-black text-amber-500 active:scale-95`}
             >
-              <AlertTriangle size={18} /> Report Delay
+              <AlertTriangle size={18} /> Delay
             </button>
           </div>
         </section>
 
-        {/* Map Section */}
+        {/* Live Map UI Fixed */}
         <section
-          className={`${theme.card} rounded-[2.5rem] p-2 border ${theme.border} overflow-hidden shadow-lg`}
+          className={`${theme.card} rounded-[2.8rem] p-2 border ${theme.border} overflow-hidden shadow-2xl relative`}
         >
-          <div className="relative h-96 w-full rounded-[2.2rem] bg-slate-800 overflow-hidden border border-white/5">
-            {van?.current_lat && van?.current_lng ? (
+          <div className="absolute top-6 left-6 z-1000 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-[10px] font-black text-white uppercase tracking-widest">
+              Live GPS
+            </span>
+          </div>
+
+          <button className="absolute bottom-6 right-6 z-1000 bg-blue-600 p-3 rounded-2xl text-white shadow-xl active:scale-90 transition-transform">
+            <Navigation size={20} />
+          </button>
+
+          <div className="relative h-80 w-full rounded-[2.4rem] bg-slate-900 overflow-hidden border border-white/5">
+            {van?.current_lat ? (
               <MapContainer
-                // Use key to force map to re-mount if van ID changes,
-                // ensuring we don't get stuck on old coordinates.
                 key={van.id}
                 center={[van.current_lat, van.current_lng]}
                 zoom={17}
                 zoomControl={false}
                 style={{ height: "100%", width: "100%", zIndex: 1 }}
               >
-                <TileLayer
-                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                  attribution="&copy; Esri"
-                />
-                <TileLayer
-                  url={
-                    isDarkMode
-                      ? "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
-                      : "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
-                  }
-                />
-
-                {/* The Van Marker */}
+                <TileLayer url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}" />
                 <Marker
                   position={[van.current_lat, van.current_lng]}
-                  icon={icon}
+                  icon={vanIcon}
                 />
-
-                {/* This component forces the map to follow the blue dot */}
                 <RecenterMap lat={van.current_lat} lng={van.current_lng} />
               </MapContainer>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
-                <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-3" />
+                <Loader2
+                  className="animate-spin text-blue-600 mb-3"
+                  size={32}
+                />
                 <p className="text-[10px] font-black uppercase text-slate-500">
-                  Waiting for GPS Signal...
+                  Locking Satellite...
                 </p>
               </div>
             )}
           </div>
         </section>
+
         {/* Stats Section */}
         <section
           className={`${theme.card} rounded-4xl p-6 border ${theme.border}`}
@@ -433,7 +374,7 @@ const DriverDashboard = () => {
               <p
                 className={`text-[10px] font-black ${theme.textSub} uppercase tracking-widest mb-1`}
               >
-                Students Onboard
+                Attendance
               </p>
               <h2 className="text-3xl font-black">
                 {stats.pickedUp}{" "}
@@ -443,34 +384,34 @@ const DriverDashboard = () => {
               </h2>
             </div>
             <div
-              className={`w-10 h-10 rounded-xl ${isDarkMode ? "bg-white/5" : "bg-blue-50"} flex items-center justify-center text-blue-500`}
+              className={`w-12 h-12 rounded-2xl ${isDarkMode ? "bg-blue-500/10" : "bg-blue-50"} flex items-center justify-center text-blue-500`}
             >
-              <Users size={20} />
+              <Users size={24} />
             </div>
           </div>
           <div
-            className={`h-2 w-full ${isDarkMode ? "bg-white/5" : "bg-slate-100"} rounded-full overflow-hidden`}
+            className={`h-3 w-full ${isDarkMode ? "bg-white/5" : "bg-slate-100"} rounded-full overflow-hidden`}
           >
             <div
-              className="h-full bg-linear-to-r from-blue-600 to-indigo-400 rounded-full transition-all duration-500"
+              className="h-full bg-linear-to-r from-blue-600 to-cyan-400 rounded-full transition-all duration-1000"
               style={{ width: `${(stats.pickedUp / stats.total) * 100}%` }}
             />
           </div>
           <div className="grid grid-cols-3 mt-6 gap-2">
             <StatBlock
-              label="Picked Up"
+              label="Picked"
               val={stats.pickedUp}
               color="text-emerald-500"
               dark={isDarkMode}
             />
             <StatBlock
-              label="Pending"
+              label="Waiting"
               val={stats.pending}
               color="text-amber-500"
               dark={isDarkMode}
             />
             <StatBlock
-              label="Absent"
+              label="Away"
               val={stats.absent}
               color="text-rose-500"
               dark={isDarkMode}
@@ -481,10 +422,12 @@ const DriverDashboard = () => {
         {/* Roster Section */}
         <section className="space-y-4">
           <div className="flex justify-between items-center px-2">
-            <h3 className="font-black text-lg">Student Roster</h3>
+            <h3 className="font-black text-lg tracking-tight">
+              Student Roster
+            </h3>
             <button
               onClick={startNativeScan}
-              className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg"
+              className="p-4 bg-blue-600 rounded-2xl text-white shadow-lg active:scale-90 transition-transform"
             >
               <QrCode size={20} />
             </button>
@@ -496,10 +439,7 @@ const DriverDashboard = () => {
                 name={student.name}
                 phone={student.parent_phone}
                 status={student.status.replace("_", " ")}
-                img={
-                  student.photo_url ||
-                  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"
-                }
+                img={student.photo_url}
                 theme={theme}
                 color={
                   student.status === "picked_up"
@@ -514,52 +454,36 @@ const DriverDashboard = () => {
         </section>
       </div>
 
-      {/* NEW: MOBILE SCANNER & PIN MODAL (UPDATED FOR NATIVE & 6 DIGITS) */}
+      {/* Verification Modal */}
       {(showVerifyModal || isScanning) && (
         <div
-          className={`fixed inset-0 z-9999 flex items-end ${isScanning ? "bg-transparent" : "bg-black/80"} backdrop-blur-md animate-in fade-in duration-200`}
+          className={`fixed inset-0 z-10001 flex items-end ${isScanning ? "bg-transparent" : "bg-black/60 backdrop-blur-sm"} animate-in fade-in duration-300`}
         >
           <div
-            className={`${theme.card} w-full rounded-t-[3rem] p-6 pb-12 shadow-2xl border-t ${theme.border}`}
+            className={`${theme.card} w-full rounded-t-[3.5rem] p-8 pb-14 shadow-2xl border-t ${theme.border} transform transition-transform duration-300 translate-y-0`}
           >
-            <div className="w-12 h-1 bg-slate-700/30 rounded-full mx-auto mb-6" />
-
+            <div className="w-16 h-1.5 bg-slate-700/20 rounded-full mx-auto mb-8" />
             {isScanning ? (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <h3 className="text-xl font-black">Scanning Student ID...</h3>
-                  <p className="text-xs text-slate-500">
-                    Point camera at QR code
-                  </p>
+              <div className="space-y-8 text-center">
+                <div className="relative aspect-square w-64 mx-auto rounded-[3rem] border-4 border-blue-500/50 flex items-center justify-center">
+                  <div className="absolute inset-0 border-4 border-blue-500 rounded-[3rem] animate-pulse" />
+                  <Camera size={48} className="text-blue-500/30" />
                 </div>
-
-                {/* Visual Camera Box (Transparent for Native Camera) */}
-                <div className="relative aspect-square w-full max-w-70 mx-auto overflow-hidden rounded-4xl border-4 border-blue-600 bg-transparent flex items-center justify-center">
-                  <Camera
-                    size={48}
-                    className="text-blue-600/20 animate-pulse"
-                  />
-                  <div
-                    className="absolute inset-x-0 top-0 h-1 bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]"
-                    style={{ animation: "scan 2s linear infinite" }}
-                  />
-                </div>
-
                 <button
                   onClick={stopNativeScan}
-                  className="w-full py-4 bg-slate-800 rounded-2xl font-black text-slate-300"
+                  className="w-full py-5 bg-rose-500/10 text-rose-500 rounded-3xl font-black"
                 >
-                  Cancel Scan
+                  Cancel Scanning
                 </button>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
+              <div className="space-y-8">
+                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                      Handover Security
-                    </p>
-                    <h3 className="text-2xl font-black">
+                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">
+                      Security Check
+                    </span>
+                    <h3 className="text-3xl font-black tracking-tight mt-1">
                       {selectedStudent?.name}
                     </h3>
                   </div>
@@ -568,75 +492,87 @@ const DriverDashboard = () => {
                       setShowVerifyModal(false);
                       startNativeScan();
                     }}
-                    className="p-4 bg-blue-600/10 rounded-2xl text-blue-500"
+                    className="p-5 bg-blue-600 rounded-4xl text-white shadow-xl shadow-blue-600/20"
                   >
-                    <QrCode size={24} />
+                    <QrCode size={28} />
                   </button>
                 </div>
-
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <input
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6} // PIN length is now 6
+                    maxLength={6}
                     value={pinInput}
                     onChange={(e) =>
                       setPinInput(e.target.value.replace(/\D/g, ""))
                     }
-                    placeholder="••••••"
-                    className="w-full text-center text-5xl tracking-[0.2em] font-black py-6 rounded-4xl bg-white/5 border-2 border-white/10 focus:border-blue-500 outline-none"
+                    placeholder="000000"
+                    className="w-full text-center text-6xl tracking-[0.15em] font-black py-8 rounded-[2.5rem] bg-slate-500/5 border-2 border-white/5 focus:border-blue-500 focus:bg-blue-500/5 outline-none transition-all"
                   />
-                  <p className="text-center text-[10px] text-slate-500 font-bold uppercase">
-                    Enter 6-digit Security PIN
+                  <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                    Enter Parent's 6-Digit PIN
                   </p>
                 </div>
-
                 <button
                   onClick={submitVerification}
-                  disabled={
-                    (!scannedToken && pinInput.length < 6) || isVerifying
-                  }
-                  className={`w-full py-5 rounded-4xl font-black text-lg transition-all ${pinInput.length === 6 ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30" : "bg-slate-800 text-slate-600"}`}
+                  disabled={pinInput.length < 6 || isVerifying}
+                  className={`w-full py-6 rounded-4xl font-black text-xl shadow-2xl transition-all ${pinInput.length === 6 ? "bg-blue-600 text-white shadow-blue-600/40" : "bg-slate-800 text-slate-600"}`}
                 >
                   {isVerifying ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="animate-spin" size={20} />{" "}
-                      Verifying...
-                    </span>
+                    <Loader2 className="animate-spin mx-auto" />
                   ) : (
-                    "Confirm Verification"
+                    "Confirm Handover"
                   )}
                 </button>
-
                 <button
                   onClick={() => setShowVerifyModal(false)}
-                  className="w-full text-slate-500 font-bold text-sm"
+                  className="w-full text-slate-500 font-bold text-sm uppercase tracking-widest"
                 >
-                  Cancel
+                  Go Back
                 </button>
               </div>
             )}
           </div>
         </div>
       )}
-      {/* SUCCESS ANIMATION OVERLAY */}
+
+      {/* SUCCESS SCREEN WITH STUDENT DATA */}
       {showSuccess && (
-        <div className="fixed inset-0 z-10000 flex items-center justify-center bg-emerald-500/90 backdrop-blur-xl animate-in fade-in zoom-in duration-300">
-          <div className="text-center space-y-4">
-            <div className="bg-white rounded-full p-6 inline-block shadow-2xl animate-bounce">
-              <CheckCircle2
-                size={80}
-                className="text-emerald-500"
-                strokeWidth={3}
-              />
+        <div className="fixed inset-0 z-20000 flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-500 px-6">
+          <div className="bg-white rounded-[3.5rem] w-full max-w-sm p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] transform animate-in zoom-in-95 duration-300 text-center">
+            {/* Pulsing Avatar Area */}
+            <div className="relative flex justify-center mb-8">
+              <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping scale-150" />
+              <div className="relative">
+                <img
+                  src={
+                    selectedStudent?.photo_url ||
+                    "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"
+                  }
+                  className="w-24 h-24 rounded-full object-cover border-4 border-emerald-500 shadow-xl"
+                  alt="Verified"
+                />
+                <div className="absolute -bottom-2 -right-2 bg-emerald-500 rounded-full p-2 text-white border-4 border-white">
+                  <CheckCircle2 size={24} strokeWidth={4} />
+                </div>
+              </div>
             </div>
-            <h2 className="text-4xl font-black text-white uppercase tracking-tighter">
+
+            <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-1 uppercase italic">
               Verified
             </h2>
-            <p className="text-white/80 font-bold uppercase tracking-widest text-sm">
-              Student Status Updated
+            <h3 className="text-xl font-black text-blue-600 mb-2">
+              {selectedStudent?.name}
+            </h3>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] bg-slate-100 py-2 px-4 rounded-full inline-block">
+              Status Updated Successfully
             </p>
+
+            <div className="mt-10 pt-8 border-t border-slate-100">
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-tighter animate-pulse">
+                Syncing with Cloud...
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -644,7 +580,6 @@ const DriverDashboard = () => {
   );
 };
 
-// ... Sub-components (StudentItem, StatBlock) remain as you provided them
 const StudentItem = ({
   name,
   phone,
@@ -656,19 +591,24 @@ const StudentItem = ({
   onAction,
 }: any) => (
   <div
-    className={`${theme.card} p-4 rounded-3xl border ${theme.border} flex items-center justify-between shadow-sm`}
+    className={`${theme.card} p-4 rounded-4xl border ${theme.border} flex items-center justify-between shadow-sm active:scale-[0.98] transition-transform`}
   >
     <div className="flex items-center gap-4">
-      <div className={`p-0.5 rounded-full border-2 ${color}`}>
+      <div className={`p-1 rounded-full border-2 ${color} bg-slate-500/10`}>
         <img
-          src={img}
+          src={
+            img ||
+            "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"
+          }
           className="w-12 h-12 rounded-full object-cover"
           alt={name}
         />
       </div>
       <div>
-        <h4 className="font-bold text-sm">{name}</h4>
-        <p className={`text-[10px] font-bold ${theme.textSub} capitalize`}>
+        <h4 className="font-black text-sm tracking-tight">{name}</h4>
+        <p
+          className={`text-[10px] font-bold ${theme.textSub} uppercase tracking-tighter`}
+        >
           {status}
         </p>
       </div>
@@ -676,15 +616,19 @@ const StudentItem = ({
     <div className="flex items-center gap-2">
       <a
         href={`tel:${phone}`}
-        className={`p-2 rounded-xl ${theme.bg} text-blue-500`}
+        className={`p-3 rounded-2xl ${theme.bg} text-blue-500 border ${theme.border}`}
       >
         <Phone size={18} />
       </a>
       <button
         onClick={onAction}
-        className={`p-2 rounded-xl ${isDone ? "bg-emerald-500 text-white" : theme.bg + " " + theme.textSub}`}
+        className={`p-3 rounded-2xl ${isDone ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : theme.bg + " border " + theme.border + " " + theme.textSub}`}
       >
-        {isDone ? <CheckCircle2 size={18} /> : <QrCode size={18} />}
+        {isDone ? (
+          <CheckCircle2 size={18} strokeWidth={3} />
+        ) : (
+          <QrCode size={18} />
+        )}
       </button>
     </div>
   </div>
@@ -692,10 +636,12 @@ const StudentItem = ({
 
 const StatBlock = ({ label, val, color, dark }: any) => (
   <div
-    className={`${dark ? "bg-white/5" : "bg-slate-50"} p-3 rounded-2xl text-center border border-white/5`}
+    className={`${dark ? "bg-white/5" : "bg-slate-50"} p-4 rounded-3xl text-center border border-white/5`}
   >
-    <p className={`text-[8px] font-black opacity-60 uppercase mb-1`}>{label}</p>
-    <p className={`text-sm font-black ${color}`}>{val}</p>
+    <p className="text-[8px] font-black opacity-40 uppercase mb-1 tracking-widest">
+      {label}
+    </p>
+    <p className={`text-lg font-black ${color}`}>{val}</p>
   </div>
 );
 

@@ -5,6 +5,7 @@ import { supabase } from "../config/supabaseClient";
 export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
   // Use Refs to persist coordinates across the session without triggering re-renders
   const lastCoords = useRef({ lat: 0, lng: 0 });
+  const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isActive || !vanId) return;
@@ -72,11 +73,17 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
       (error) => console.error("GPS Watch Error:", error),
       {
         enableHighAccuracy: true,
-        maximumAge: 0,
+        maximumAge: 15000,
         timeout: 10000,
       },
     );
+    watchIdRef.current = watchId;
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
   }, [vanId, isActive]);
 };

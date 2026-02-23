@@ -1,89 +1,79 @@
-import { MapContainer, TileLayer, Marker, useMap, Popup, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
-// 1. Custom Bus Icon
-const busIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png", 
+// 1. Better Icon Handling (prevents multiple icon class issues)
+const createBusIcon = (heading: number) => new L.DivIcon({
+  html: `<div style="transform: rotate(${heading || 0}deg); transition: all 0.5s ease-in-out;">
+           <img src="https://cdn-icons-png.flaticon.com/512/3448/3448339.png" style="width:40px; height:40px;" />
+         </div>`,
+  className: "custom-bus-container",
   iconSize: [40, 40],
   iconAnchor: [20, 20],
-  className: "bus-marker-icon", 
 });
 
-// 2. Component to handle auto-centering the map
 const RecenterMap = ({ lat, lng }: { lat: number; lng: number }) => {
   const map = useMap();
   useEffect(() => {
     if (lat && lng) {
-      map.setView([lat, lng], 16, { animate: true });
+      // .flyTo makes the movement smooth and professional
+      map.flyTo([lat, lng], map.getZoom(), {
+        animate: true,
+        duration: 1.5
+      });
     }
   }, [lat, lng, map]);
   return null;
 };
 
-// 3. LiveMap now accepts routePath for the polyline trail
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LiveMap = ({ lat, lng, isOnBus, heading, routePath }: any) => {
-  const center: [number, number] = lat && lng ? [lat, lng] : [0.3476, 32.5825];
+  // Memoize icon to prevent flickering during rapid GPS updates
+  const dynamicIcon = useMemo(() => createBusIcon(heading), [heading]);
 
-  // Rotate the icon using CSS transform when heading or position changes
-  useEffect(() => {
-    const iconElement = document.querySelector(".bus-marker-icon") as HTMLElement;
-    if (iconElement && heading !== undefined) {
-      iconElement.style.transform = `rotate(${heading}deg)`;
-      iconElement.style.transition = "transform 0.5s ease-in-out"; 
-    }
-  }, [heading, lat, lng]); // Re-apply rotation whenever the bus moves or turns
+  // Handle case where coords might be strings from database
+  const nLat = parseFloat(lat);
+  const nLng = parseFloat(lng);
+  const center: [number, number] = nLat && nLng ? [nLat, nLng] : [0.3476, 32.5825];
 
   return (
-    <div className="h-full w-full relative z-0">
+    <div className="h-full w-full relative z-0 overflow-hidden rounded-4xl">
       <MapContainer
         center={center}
         zoom={16}
+        zoomControl={false} // Cleaner UI for mobile
         scrollWheelZoom={true}
         className="h-full w-full"
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap'
+          attribution='&copy; OSM'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* 4. The Polyline Trail (Drawn behind the bus) */}
         {routePath && routePath.length > 1 && (
           <Polyline 
             positions={routePath} 
-            pathOptions={{ 
-              color: '#3b82f6', // Bright blue trail
-              weight: 5, 
-              opacity: 0.6,
-              lineJoin: 'round'
-            }} 
+            pathOptions={{ color: '#3b82f6', weight: 4, opacity: 0.5, lineCap: 'round' }} 
           />
         )}
         
-        {lat && lng && (
+        {nLat && nLng && (
           <>
-            <Marker position={[lat, lng]} icon={busIcon}>
-              <Popup>
-                <div className="font-bold">
-                  {isOnBus ? "🚌 Bus is moving" : "🅿️ Bus is parked"}
-                  {heading && (
-                    <div className="text-[10px] text-gray-500">
-                      Heading: {Math.round(heading)}°
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-            <RecenterMap lat={lat} lng={lng} />
+            <Marker position={[nLat, nLng]} icon={dynamicIcon} />
+            <RecenterMap lat={nLat} lng={nLng} />
           </>
         )}
       </MapContainer>
 
+      {/* Modern Badge UI */}
       {isOnBus && (
-        <div className="absolute top-4 right-4 z-1000 bg-white px-3 py-1.5 rounded-full shadow-lg border border-blue-100 flex items-center gap-2">
-          <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
-          <span className="text-[10px] font-black text-gray-700 uppercase">Live GPS</span>
+        <div className="absolute top-4 right-4 z-1000 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-xl border border-blue-100 flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+          </span>
+          <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Live</span>
         </div>
       )}
     </div>
