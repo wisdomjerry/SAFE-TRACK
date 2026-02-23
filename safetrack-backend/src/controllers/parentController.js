@@ -5,8 +5,10 @@ const {
   createParentService,
   getParentChildrenService,
   updateStudentGuardianPin,
+  updateHomeLocationService
 } = require("../services/parentService");
 const { getChildAttendanceHistory } = require("../services/parentService");
+const { supabase } = require("../config/supabaseClient");
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
@@ -157,10 +159,38 @@ async function setGuardianPin(req, res) {
   }
 }
 
+// UPDATE HOME LOCATION
+async function updateHomeLocation(req, res) {
+  try {
+    const { id } = req.params;
+    const { home_lat, home_lng } = req.body;
+
+    if (!id || home_lat === undefined || home_lng === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing student ID or coordinates" 
+      });
+    }
+
+    // Call the service
+    const data = await updateHomeLocationService(id, home_lat, home_lng);
+
+    res.status(200).json({
+      success: true,
+      message: "Home location updated successfully",
+      data,
+    });
+  } catch (error) {
+    console.error("updateHomeLocation Error:", error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   loginParent,
   createParent,
   getChildren,
   getHistory,
   setGuardianPin,
+  updateHomeLocation,
 };

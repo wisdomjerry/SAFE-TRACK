@@ -149,6 +149,22 @@ async function updateStudentGuardianPin(student_id, parent_id, new_pin) {
   console.log("✅ Database Updated Successfully:", data[0].guardian_pin);
   return data;
 }
+
+async function updateHomeLocationService(student_id, lat, lng) {
+  const { data, error } = await supabase
+    .from("students")
+    .update({ 
+      home_lat: lat, 
+      home_lng: lng 
+    })
+    .eq("id", student_id)
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+
 module.exports = {
   parentLoginService,
   createParentService,
@@ -157,4 +173,5 @@ module.exports = {
   getChildAttendanceHistory,
   updateStudentGuardianPin,
   logHandoverEvent,
+  updateHomeLocationService,
 };
