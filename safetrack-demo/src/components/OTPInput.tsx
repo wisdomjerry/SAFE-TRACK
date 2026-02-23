@@ -62,6 +62,7 @@ const OTPInput: React.FC<OTPInputProps> = ({ phoneNumber, onVerified }) => {
       } else {
         toast.error("Invalid OTP. Try again.");
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
   // Keep the 'any' but cast it in the logic (Quickest fix)
   const error = err as { response?: { data?: { message?: string } } };

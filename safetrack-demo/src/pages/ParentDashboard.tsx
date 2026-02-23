@@ -42,7 +42,6 @@ interface LogEntry {
   van_id: string;
 }
 
-// Helper to calculate distance in KM
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -71,8 +70,6 @@ const ParentDashboard = () => {
   });
 
   const prevIsOnBusRef = useRef<boolean | null>(null);
-
-  // SAFE DEFINITION: This prevents the "Cannot read properties of undefined" error
   const activeChild = children.length > 0 ? children[0] : null;
 
   const theme = {
@@ -94,27 +91,26 @@ const ParentDashboard = () => {
       if (childrenData.length > 0) {
         const firstChild = childrenData[0];
         setGuardianPin(firstChild.guardian_pin || "");
+        
+        // Synchronize our Ref with the database state
+        prevIsOnBusRef.current = firstChild.is_on_bus;
 
-        if (prevIsOnBusRef.current === null) {
-          prevIsOnBusRef.current = firstChild.is_on_bus;
-        }
-
+        // Fetch History
         const { data: history } = await supabase
           .from("van_location_history")
           .select("lat, lng")
           .eq("van_id", firstChild.van_id)
           .order("created_at", { ascending: true })
           .limit(50);
-
         if (history) setRoutePath(history.map((h) => [h.lat, h.lng]));
 
+        // Fetch Logs
         const { data: logsData } = await supabase
           .from("pickup_logs")
           .select("id, action_type, scanned_at, van_id")
           .eq("student_id", firstChild.id)
           .order("scanned_at", { ascending: false })
           .limit(10);
-
         if (logsData) setLogs(logsData as LogEntry[]);
       }
     } catch (err) {
@@ -123,6 +119,23 @@ const ParentDashboard = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // --- PIN ROTATION ---
+  const autoRotatePin = async (studentId: string) => {
+    const newPin = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+      await axios.patch(`/api/parents/students/${studentId}/guardian-pin`, {
+        guardian_pin: newPin,
+      });
+      setGuardianPin(newPin);
+    } catch (err) {
+      console.error("Auto-rotation failed", err);
+    }
+  };
 
   // --- UPDATE HOME LOCATION ---
   const updateHomeLocation = () => {
@@ -145,12 +158,10 @@ const ParentDashboard = () => {
 
   // --- GEOFENCE MONITOR ---
   useEffect(() => {
-    // SAFE GUARD: Don't run logic if activeChild hasn't loaded yet
     if (!activeChild || hasNotifiedProximity || !activeChild.is_on_bus) return;
 
     const destLat = activeChild.home_lat || 0.3476;
     const destLng = activeChild.home_lng || 32.5825;
-
     const distance = getDistance(activeChild.lat, activeChild.lng, destLat, destLng);
 
     if (distance < 0.5) {
@@ -160,27 +171,11 @@ const ParentDashboard = () => {
     }
   }, [activeChild?.lat, activeChild?.lng, activeChild?.is_on_bus, hasNotifiedProximity, activeChild]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // --- PIN ROTATION ---
-  const autoRotatePin = async (studentId: string) => {
-    const newPin = Math.floor(100000 + Math.random() * 900000).toString();
-    try {
-      await axios.patch(`/api/parents/students/${studentId}/guardian-pin`, {
-        guardian_pin: newPin,
-      });
-      setGuardianPin(newPin);
-    } catch (err) {
-      console.error("Auto-rotation failed", err);
-    }
-  };
-
   // --- REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
     if (children.length === 0) return;
 
+    // 1. VAN TRACKING
     const vanChannel = supabase
       .channel("live-van-tracking")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "vans" }, (payload) => {
@@ -204,12 +199,15 @@ const ParentDashboard = () => {
       )
       .subscribe();
 
+    // 2. STUDENT STATUS (BOARDING/PIN)
     const studentChannel = supabase
       .channel("student-status-monitor")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "students" }, (payload) => {
           const updatedFields = payload.new as Child;
-          const hasBoarded = !prevIsOnBusRef.current && updatedFields.is_on_bus;
-          const hasDropped = prevIsOnBusRef.current && !updatedFields.is_on_bus;
+          
+          // Detect Change
+          const hasBoarded = prevIsOnBusRef.current === false && updatedFields.is_on_bus === true;
+          const hasDropped = prevIsOnBusRef.current === true && updatedFields.is_on_bus === false;
 
           if (hasBoarded || hasDropped) {
             prevIsOnBusRef.current = updatedFields.is_on_bus;
@@ -218,17 +216,23 @@ const ParentDashboard = () => {
               msg: hasBoarded ? "Child has boarded the van!" : "Child has been dropped off!",
             });
             setTimeout(() => setShowToast({ show: false, msg: "" }), 5000);
+
             if (hasBoarded) {
                 autoRotatePin(updatedFields.id);
                 setHasNotifiedProximity(false); 
             }
-            setTimeout(loadData, 1000);
+            // Small delay to let DB logs settle before fetching
+            setTimeout(loadData, 2000);
           }
 
+          // IMMEDIATE STATE UPDATE (Prevents UI lag or reverting)
           setChildren((current) =>
             current.map((c) => (c.id === updatedFields.id ? { ...c, ...updatedFields } : c))
           );
-          if (updatedFields.guardian_pin) setGuardianPin(updatedFields.guardian_pin);
+          
+          if (updatedFields.guardian_pin) {
+            setGuardianPin(updatedFields.guardian_pin);
+          }
         }
       )
       .subscribe();
@@ -248,10 +252,10 @@ const ParentDashboard = () => {
 
   return (
     <div className={`${theme.bg} min-h-screen pb-32 transition-colors duration-300`}>
-      {/* TOAST */}
+      {/* TOAST NOTIFICATION */}
       {showToast.show && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-100 w-[90%] max-w-md animate-bounce">
-          <div className="bg-emerald-600 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-100 w-[90%] max-w-md">
+          <div className="bg-emerald-600 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3 animate-bounce">
             <CheckCircle2 size={24} />
             <p className="font-bold text-sm">{showToast.msg}</p>
           </div>
@@ -268,7 +272,7 @@ const ParentDashboard = () => {
           <h1 className={`text-2xl font-black ${theme.textMain} leading-tight`}>{activeChild.full_name}</h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={updateHomeLocation} className={`w-10 h-10 ${theme.inner} border ${theme.border} rounded-xl flex items-center justify-center`}>
+          <button onClick={updateHomeLocation} className={`w-10 h-10 ${theme.inner} border ${theme.border} rounded-xl flex items-center justify-center active:scale-95 transition-transform`}>
             <MapPin size={18} className="text-emerald-500" />
           </button>
           <button onClick={() => setIsDarkMode(!isDarkMode)} className={`w-10 h-10 ${theme.inner} border ${theme.border} rounded-xl flex items-center justify-center`}>
@@ -278,13 +282,18 @@ const ParentDashboard = () => {
       </header>
 
       <div className="px-5 mt-6 space-y-8">
-        {/* QR SECTION */}
+        {/* QR & PIN SECTION */}
         <section className={`${theme.card} rounded-[2.5rem] p-8 shadow-xl border ${theme.border} text-center`}>
           <p className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em] mb-6`}>
-            {activeChild.is_on_bus ? "Drop-off Token" : "Pickup Token"}
+            {activeChild.is_on_bus ? "Drop-off Token (Active)" : "Pickup Token (Pending)"}
           </p>
           <div className="inline-block p-4 bg-white rounded-3xl mb-6 shadow-sm">
-            <QRCodeSVG value={activeChild.handover_token || activeChild.id} size={160} level="H" includeMargin={true} />
+            <QRCodeSVG 
+              value={activeChild.handover_token || activeChild.id} 
+              size={160} 
+              level="H" 
+              includeMargin={true} 
+            />
           </div>
           <div className="flex gap-2 justify-center">
             {guardianPin.split("").map((char, i) => (
@@ -295,7 +304,7 @@ const ParentDashboard = () => {
           </div>
         </section>
 
-        {/* MAP SECTION */}
+        {/* LIVE MAP SECTION */}
         <section>
           <div className="flex justify-between items-center mb-4 px-2">
             <h3 className={`font-black ${theme.textMain} text-sm uppercase`}>Live Tracking</h3>
@@ -306,31 +315,43 @@ const ParentDashboard = () => {
           </div>
           <div className={`${theme.card} rounded-[2.5rem] p-2 relative shadow-lg border ${theme.border}`}>
             <div className="h-64 w-full rounded-[2.2rem] overflow-hidden">
-              <LiveMap lat={activeChild.lat} lng={activeChild.lng} isOnBus={activeChild.is_on_bus} routePath={routePath} heading={activeChild.heading} />
+              <LiveMap 
+                lat={activeChild.lat} 
+                lng={activeChild.lng} 
+                isOnBus={activeChild.is_on_bus} 
+                routePath={routePath} 
+                heading={activeChild.heading} 
+              />
             </div>
             <button 
-                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${activeChild.lat},${activeChild.lng}`, '_blank')}
-                className="absolute bottom-20 right-6 bg-white p-3 rounded-full shadow-lg text-blue-600 active:scale-90"
+              onClick={() => window.open(`https://www.google.com/maps?q=${activeChild.lat},${activeChild.lng}`, '_blank')}
+              className="absolute bottom-20 right-6 bg-white p-3 rounded-full shadow-lg text-blue-600 active:scale-90"
             >
-                <Navigation size={20} fill="currentColor" />
+              <Navigation size={20} fill="currentColor" />
             </button>
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl ${isDarkMode ? "bg-blue-500/20" : "bg-blue-50"} flex items-center justify-center text-blue-600`}><MapPin size={20} /></div>
+                <div className={`w-10 h-10 rounded-xl ${isDarkMode ? "bg-blue-500/20" : "bg-blue-50"} flex items-center justify-center text-blue-600`}>
+                  <MapPin size={20} />
+                </div>
                 <div className="max-w-45">
-                  <p className={`text-[10px] ${theme.textSub} font-black uppercase`}>Location</p>
-                  <p className={`text-xs font-bold ${theme.textMain} truncate`}>{activeChild.current_location_name || "Estimating..."}</p>
+                  <p className={`text-[10px] ${theme.textSub} font-black uppercase`}>Current Location</p>
+                  <p className={`text-xs font-bold ${theme.textMain} truncate`}>
+                    {activeChild.current_location_name || "Detecting..."}
+                  </p>
                 </div>
               </div>
-              <a href={`tel:${activeChild.driver_phone}`} className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg"><Phone size={20} /></a>
+              <a href={`tel:${activeChild.driver_phone}`} className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg active:scale-95">
+                <Phone size={20} />
+              </a>
             </div>
           </div>
         </section>
 
-        {/* HISTORY */}
+        {/* ACTIVITY LOGS */}
         <div className="space-y-6">
-          <HistorySection title="Pickup Activity" theme={theme} items={logs.filter((l) => l.action_type === "pickup")} />
-          <HistorySection title="Drop-off Activity" theme={theme} isDropoff items={logs.filter((l) => l.action_type === "dropoff")} />
+          <HistorySection title="Pickup Activity" theme={theme} items={logs.filter(l => l.action_type === "pickup")} />
+          <HistorySection title="Drop-off Activity" theme={theme} isDropoff items={logs.filter(l => l.action_type === "dropoff")} />
         </div>
       </div>
     </div>
@@ -355,7 +376,9 @@ const HistorySection = ({ title, theme, items, isDropoff }: any) => (
           />
         ))
       ) : (
-        <div className={`p-10 text-center ${theme.textSub} text-[10px] font-bold uppercase opacity-50`}>No recent activity</div>
+        <div className={`p-10 text-center ${theme.textSub} text-[10px] font-bold uppercase opacity-50`}>
+          No recent activity logs
+        </div>
       )}
     </div>
   </section>
