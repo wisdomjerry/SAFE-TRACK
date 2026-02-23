@@ -8,7 +8,6 @@ const {
   updateHomeLocationService
 } = require("../services/parentService");
 const { getChildAttendanceHistory } = require("../services/parentService");
-const { supabase } = require("../config/supabaseClient");
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
