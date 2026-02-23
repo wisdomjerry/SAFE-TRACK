@@ -14,7 +14,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios"; // Importing your active API instance
 import { supabase } from "../config/supabaseClient";
-import { NativeBiometric } from 'capacitor-native-biometric';
+import { NativeBiometric } from "capacitor-native-biometric";
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -42,60 +42,69 @@ const SettingsPage = () => {
 
   /* ================= HANDLERS ================= */
 
-  const handleToggle = async (key: 'push' | 'biometric' | 'twoFactor') => {
-  const newVal = !toggles[key];
+  const handleToggle = async (key: "push" | "biometric" | "twoFactor") => {
+    const newVal = !toggles[key];
 
-  // --- NATIVE BIOMETRIC LOGIC ---
-  if (key === 'biometric' && newVal === true) {
-    try {
-      const result = await NativeBiometric.isAvailable();
-      
-      if (!result.isAvailable) {
-        alert("Biometrics not supported on this device.");
-        return; // Don't toggle the switch
-      }
+    // 1. Get the Fresh ID from Supabase directly to avoid "undefined"
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const userId = user?.id || userData.id;
 
-      // Trigger the actual hardware prompt
-      await NativeBiometric.verifyIdentity({
-        reason: "Confirm your identity to enable Biometric Login",
-        title: "SafeTrack Security",
-        subtitle: "Authenticate using your fingerprint or face",
-        description: "This allows you to log in faster next time.",
-      });
-      
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (err) {
-      console.log("User cancelled biometric check");
-      return; // Exit without toggling if they cancel or fail
+    if (!userId) {
+      alert("User session not found. Please log in again.");
+      return;
     }
-  }
 
-  // --- DATABASE UPDATE LOGIC ---
-  setToggles(prev => ({ ...prev, [key]: newVal }));
+    // --- NATIVE BIOMETRIC LOGIC ---
+    if (key === "biometric" && newVal === true) {
+      try {
+        const result = await NativeBiometric.isAvailable();
+        if (!result.isAvailable) {
+          alert("Biometrics not supported on this device.");
+          return;
+        }
 
-  const columnMap = {
-    push: 'push_enabled',
-    biometric: 'biometric_enabled',
-    twoFactor: 'two_factor_enabled'
+        await NativeBiometric.verifyIdentity({
+          reason: "Confirm your identity to enable Biometric Login",
+          title: "SafeTrack Security",
+          subtitle: "Authenticate using your fingerprint or face",
+          description: "This allows you to log in faster next time.",
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (err) {
+        console.log("User cancelled biometric check");
+        return;
+      }
+    }
+
+    // --- DATABASE UPDATE LOGIC ---
+    // Optimistically update UI
+    setToggles((prev) => ({ ...prev, [key]: newVal }));
+
+    const columnMap = {
+      push: "push_enabled",
+      biometric: "biometric_enabled",
+      twoFactor: "two_factor_enabled",
+    };
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ [columnMap[key]]: newVal })
+        .eq("id", userId); // Use the validated userId here
+
+      if (error) throw error;
+
+      localStorage.setItem(`pref_${key}`, String(newVal));
+    } catch (err) {
+      // Revert UI if DB fails
+      setToggles((prev) => ({ ...prev, [key]: !newVal }));
+      console.error("Supabase update failed:", err);
+    }
   };
 
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ [columnMap[key]]: newVal })
-      .eq('id', userData.id);
-
-    if (error) throw error;
-    
-    // Save to local storage for persistence
-    localStorage.setItem(`pref_${key}`, String(newVal));
-  } catch (err) {
-    setToggles(prev => ({ ...prev, [key]: !newVal }));
-    console.error("Supabase update failed:", err);
-  }
-};
-
-  const handlePasswordChange = (field: string, value: string) => {
+  const handlePasswordChange = (field: keyof typeof passwords, value: string) => {
     setPasswords((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -151,20 +160,25 @@ const SettingsPage = () => {
 
     if (confirmed) {
       try {
-        // Option A: Delete the profile row (RLS must allow this)
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const userId = user?.id || userData.id;
+
+        if (!userId) throw new Error("No User ID found");
+
         const { error } = await supabase
           .from("profiles")
           .delete()
-          .eq("id", userData.id);
+          .eq("id", userId);
 
         if (error) throw error;
 
-        // Sign out and clear local data
         await supabase.auth.signOut();
         localStorage.clear();
         window.location.href = "/login";
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
+        console.error("Delete failed:", err);
         alert("Could not delete account. Contact support.");
       }
     }
@@ -234,9 +248,10 @@ const SettingsPage = () => {
           </div>
 
           <div className="grid gap-4">
-            {["current", "newPass", "confirm"].map((field) => (
-              <div key={field} className="relative">
+            {(["current", "newPass", "confirm"] as const).map((field) => (
+              <div key={field} className="relative group">
                 <input
+                  // Switch between password and text
                   type={showPassword ? "text" : "password"}
                   placeholder={
                     field === "current"
@@ -245,12 +260,29 @@ const SettingsPage = () => {
                         ? "New Password"
                         : "Confirm New Password"
                   }
-                  value={passwords[field as keyof typeof passwords]}
+                  // This ensures the input value is linked to state correctly
+                  value={passwords[field]}
+                  // This ensures typing actually updates the state
                   onChange={(e) => handlePasswordChange(field, e.target.value)}
-                  className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 transition-all text-sm outline-none"
+                  className="w-full px-5 py-4 pr-12 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 transition-all text-sm outline-none"
                 />
+
+                {/* Eye Icon inside the input */}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             ))}
+
+            {passwordError && (
+              <p className="text-rose-500 text-xs font-bold bg-rose-50 p-3 rounded-xl border border-rose-100 animate-in fade-in slide-in-from-top-1">
+                {passwordError}
+              </p>
+            )}
 
             <button
               type="button"

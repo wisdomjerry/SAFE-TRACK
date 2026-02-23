@@ -440,21 +440,44 @@ const setPin = async (req, res) => {
 const updatePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
-        const user = await User.findById(req.user.id).select('+password');
+        const { id, role } = req.user; // From JWT middleware
 
-        // Check if current password is correct
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        const tableMap = {
+            SUPER_ADMIN: "profiles",
+            SCHOOL_ADMIN: "schools",
+            DRIVER: "drivers",
+            PARENT: "parents",
+        };
+
+        const tableName = tableMap[role];
+
+        // 1. Fetch the user to get current hashed PIN
+        const { data: user, error: fetchError } = await supabase
+            .from(tableName)
+            .select("pin")
+            .eq("id", id)
+            .single();
+
+        if (fetchError || !user) return res.status(404).json({ message: 'User not found' });
+
+        // 2. Compare current PIN
+        const isMatch = await bcrypt.compare(String(currentPassword), user.pin);
         if (!isMatch) {
-            return res.status(401).json({ message: 'Current password is incorrect' });
+            return res.status(401).json({ message: 'Current PIN is incorrect' });
         }
 
-        // Hash new password
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(newPassword, salt);
-        await user.save();
+        // 3. Hash and Save new PIN
+        const hashedPin = await bcrypt.hash(String(newPassword), 10);
+        const { error: updateError } = await supabase
+            .from(tableName)
+            .update({ pin: hashedPin })
+            .eq("id", id);
 
-        res.status(200).json({ message: 'Password updated successfully' });
+        if (updateError) throw updateError;
+
+        res.status(200).json({ success: true, message: 'PIN updated successfully' });
     } catch (err) {
+        console.error("Update Password Error:", err.message);
         res.status(500).json({ message: 'Server error' });
     }
 };
@@ -478,8 +501,22 @@ const updateProfile = async (req, res) => {
 const toggleBiometric = async (req, res) => {
     try {
         const { enabled } = req.body;
-        await User.findByIdAndUpdate(req.user.id, { biometric_enabled: enabled });
-        res.status(200).json({ message: `Biometrics ${enabled ? 'enabled' : 'disabled'}` });
+        const { id, role } = req.user;
+
+        const tableMap = {
+            SUPER_ADMIN: "profiles",
+            SCHOOL_ADMIN: "schools",
+            DRIVER: "drivers",
+            PARENT: "parents",
+        };
+
+        const { error } = await supabase
+            .from(tableMap[role])
+            .update({ biometric_enabled: enabled })
+            .eq("id", id);
+
+        if (error) throw error;
+        res.status(200).json({ success: true, message: `Biometrics ${enabled ? 'enabled' : 'disabled'}` });
     } catch (err) {
         res.status(500).json({ message: 'Operation failed' });
     }
