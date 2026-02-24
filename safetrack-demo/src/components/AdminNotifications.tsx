@@ -19,6 +19,7 @@ const AdminNotifications = () => {
       setSentStatus(true);
       setFormData({ title: "", message: "", type: "info" });
       setTimeout(() => setSentStatus(false), 3000); // Reset success state after 3s
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error(err);
       alert(err.response?.data?.message || "Failed to send notification");
@@ -27,6 +28,7 @@ const AdminNotifications = () => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const typeConfig: any = {
     info: { icon: <Info size={16} />, color: "bg-blue-600", light: "bg-blue-50", text: "text-blue-600" },
     urgent: { icon: <AlertCircle size={16} />, color: "bg-rose-600", light: "bg-rose-50", text: "text-rose-600" },

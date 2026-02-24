@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios";
 import { ShieldCheck, Phone, Lock, KeyRound, ArrowLeft, CheckCircle2 } from "lucide-react";
 
 const ResetPin = () => {
@@ -19,7 +19,7 @@ const ResetPin = () => {
   setLoading(true);
   try {
     // We send 'reason: reset' so the backend knows to bypass the "already has a PIN" check
-    await axios.post("/api/auth/forgot-pin", { 
+    await api.post("/api/auth/forgot-pin", { 
       phone_number: phone,
       reason: "reset" 
     });
@@ -39,13 +39,13 @@ const ResetPin = () => {
   setLoading(true);
   try {
     // 1. Verify the code
-    await axios.post("/api/auth/reset-pin", { 
+    await api.post("/api/auth/reset-pin", { 
       phone_number: phone, 
       otp: otp 
     });
 
     // 2. Immediately set the new PIN
-    await axios.post("/api/auth/set-pin", { 
+    await api.post("/api/auth/set-pin", { 
       phone_number: phone, 
       pin: newPin 
     });
