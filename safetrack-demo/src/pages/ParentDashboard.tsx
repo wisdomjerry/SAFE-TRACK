@@ -90,23 +90,13 @@ const ParentDashboard = () => {
   // --- DATA LOADING ---
   const loadData = useCallback(async () => {
     try {
-      // 1. Fetch main student data
+      // 1. Fetch Student Status from Backend
       const res = await axios.get("/api/parents/children");
       const childrenData: Child[] = res.data.data || [];
 
-      console.log(
-        "📥 API DATA LOADED:",
-        childrenData[0]?.is_on_bus ? "ON BOARD" : "WAITING",
-      );
-
       // --- ANTI-FLICKER PROTECTION ---
       setChildren((prev) => {
-        // If we are currently "locking" the state (because a scan just happened),
-        // don't let the API overwrite the bus status with old data.
         if (isUpdatingRef.current) {
-          console.log(
-            "🛡️ PROTECTING UI: API is stale, keeping 'On Board' status.",
-          );
           return childrenData.map((newChild) => {
             const currentUI = prev.find((c) => c.id === newChild.id);
             return currentUI
@@ -121,23 +111,25 @@ const ParentDashboard = () => {
         const firstChild = childrenData[0];
         setGuardianPin(firstChild.guardian_pin || "");
 
-        // Synchronize Ref only if not in a "locked" update state
         if (!isUpdatingRef.current) {
           prevIsOnBusRef.current = firstChild.is_on_bus;
         }
 
-        // 2. Fetch History from BACKEND API
-        const historyRes = await axios.get(
-          `/api/parents/van-history/${firstChild.van_id}`,
-        );
-        if (historyRes.data.success) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setRoutePath(historyRes.data.data.map((h: any) => [h.lat, h.lng]));
+        // 2. Fetch Route Path for the Map (Use Supabase to avoid 404)
+        const { data: historyData } = await supabase
+          .from("van_location_history")
+          .select("lat, lng")
+          .eq("van_id", firstChild.van_id)
+          .order("created_at", { ascending: true })
+          .limit(50);
+
+        if (historyData) {
+          setRoutePath(historyData.map((h) => [h.lat, h.lng]));
         }
 
-        // 3. Fetch Logs from BACKEND API
+        // 3. Fetch Logs from BACKEND API (Fixing the URL with backticks)
         const logsRes = await axios.get(
-          "/api/parents/history/${firstChild.id}",
+          `/api/parents/history/${firstChild.id}`,
         );
         if (logsRes.data.success) {
           setLogs(logsRes.data.data as LogEntry[]);
