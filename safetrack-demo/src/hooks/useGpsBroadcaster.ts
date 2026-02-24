@@ -74,7 +74,7 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
       {
         enableHighAccuracy: true,
         maximumAge: 15000,
-        timeout: 10000,
+        timeout: 0,
       },
     );
     watchIdRef.current = watchId;
