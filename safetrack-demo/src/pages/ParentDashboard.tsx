@@ -75,6 +75,7 @@ const ParentDashboard = () => {
   });
 
   const prevIsOnBusRef = useRef<boolean | null>(null);
+  const isUpdatingRef = useRef(false); // <--- ADD THIS LINE HERE
   const activeChild = children.length > 0 ? children[0] : null;
 
   const theme = {
@@ -89,41 +90,58 @@ const ParentDashboard = () => {
   // --- DATA LOADING ---
   const loadData = useCallback(async () => {
     try {
+      // 1. Fetch main student data
       const res = await axios.get("/api/parents/children");
       const childrenData: Child[] = res.data.data || [];
 
-      // LOG DATA FROM API
       console.log(
         "📥 API DATA LOADED:",
         childrenData[0]?.is_on_bus ? "ON BOARD" : "WAITING",
       );
 
-      setChildren(childrenData);
+      // --- ANTI-FLICKER PROTECTION ---
+      setChildren((prev) => {
+        // If we are currently "locking" the state (because a scan just happened),
+        // don't let the API overwrite the bus status with old data.
+        if (isUpdatingRef.current) {
+          console.log(
+            "🛡️ PROTECTING UI: API is stale, keeping 'On Board' status.",
+          );
+          return childrenData.map((newChild) => {
+            const currentUI = prev.find((c) => c.id === newChild.id);
+            return currentUI
+              ? { ...newChild, is_on_bus: currentUI.is_on_bus }
+              : newChild;
+          });
+        }
+        return childrenData;
+      });
 
       if (childrenData.length > 0) {
         const firstChild = childrenData[0];
         setGuardianPin(firstChild.guardian_pin || "");
 
-        // Synchronize our Ref with the database state
-        prevIsOnBusRef.current = firstChild.is_on_bus;
+        // Synchronize Ref only if not in a "locked" update state
+        if (!isUpdatingRef.current) {
+          prevIsOnBusRef.current = firstChild.is_on_bus;
+        }
 
-        // Fetch History
-        const { data: history } = await supabase
-          .from("van_location_history")
-          .select("lat, lng")
-          .eq("van_id", firstChild.van_id)
-          .order("created_at", { ascending: true })
-          .limit(50);
-        if (history) setRoutePath(history.map((h) => [h.lat, h.lng]));
+        // 2. Fetch History from BACKEND API
+        const historyRes = await axios.get(
+          `/api/parents/van-history/${firstChild.van_id}`,
+        );
+        if (historyRes.data.success) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setRoutePath(historyRes.data.data.map((h: any) => [h.lat, h.lng]));
+        }
 
-        // Fetch Logs
-        const { data: logsData } = await supabase
-          .from("pickup_logs")
-          .select("id, action_type, scanned_at, van_id")
-          .eq("student_id", firstChild.id)
-          .order("scanned_at", { ascending: false })
-          .limit(10);
-        if (logsData) setLogs(logsData as LogEntry[]);
+        // 3. Fetch Logs from BACKEND API
+        const logsRes = await axios.get(
+          "/api/parents/history/${firstChild.id}",
+        );
+        if (logsRes.data.success) {
+          setLogs(logsRes.data.data as LogEntry[]);
+        }
       }
     } catch (err) {
       console.error("❌ API Error:", err);
@@ -255,10 +273,14 @@ const ParentDashboard = () => {
             prevIsOnBusRef.current === true &&
             updatedFields.is_on_bus === false;
 
+          // Inside your student-status-monitor channel...
           if (hasBoarded || hasDropped) {
             console.log(
               `🚀 TRANSITION DETECTED: ${hasBoarded ? "BOARDING" : "DROPPING"}`,
             );
+
+            // 1. 🛡️ TURN ON THE SHIELD
+            isUpdatingRef.current = true;
 
             prevIsOnBusRef.current = updatedFields.is_on_bus;
             setShowToast({
@@ -267,6 +289,7 @@ const ParentDashboard = () => {
                 ? "Child has boarded the van!"
                 : "Child has been dropped off!",
             });
+
             setTimeout(() => setShowToast({ show: false, msg: "" }), 5000);
 
             if (hasBoarded) {
@@ -274,14 +297,20 @@ const ParentDashboard = () => {
               setHasNotifiedProximity(false);
             }
 
-            // --- THE FIX FOR THE FLICKER ---
-            // Instead of calling loadData immediately, we log the state
+            // 2. 🔄 WAIT FOR BACKEND TO SETTLE
             console.log(
               "⏳ Waiting 3 seconds before refreshing logs to prevent flicker...",
             );
-            setTimeout(() => {
+            setTimeout(async () => {
               console.log("🔄 Triggering loadData refresh...");
-              loadData();
+              await loadData();
+
+              // 3. 🔓 RELEASE THE SHIELD AFTER LOAD IS DONE
+              // We wait an extra second here to be absolutely safe
+              setTimeout(() => {
+                isUpdatingRef.current = false;
+                console.log("🔓 Shield down. UI and API are now synced.");
+              }, 1000);
             }, 3000);
           }
 
