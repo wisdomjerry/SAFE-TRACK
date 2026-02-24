@@ -109,13 +109,17 @@ async function logHandoverEvent({ studentId, driverId, action, method, lat, lng 
 }
 
 async function getChildAttendanceHistory(student_id) {
+  // 🟢 Verified column names from your table: action_type and scanned_at
   const { data, error } = await supabase
-    .from("pickup_logs") // 🟢 Change from "attendance" to "pickup_logs"
-    .select("id, action_type, timestamp, van_id, location_name")
+    .from("pickup_logs") 
+    .select("id, action_type, scanned_at, van_id") 
     .eq("student_id", student_id)
-    .order("timestamp", { ascending: false });
+    .order("scanned_at", { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("❌ Database query error:", error.message);
+    throw new Error(error.message);
+  }
   return data;
 }
 
