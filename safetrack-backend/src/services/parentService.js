@@ -71,7 +71,7 @@ async function getParentChildrenService(parent_id) {
         lat: van?.current_lat || 0,
         lng: van?.current_lng || 0,
         current_speed: van?.current_speed || 0,
-        is_on_bus: van?.status === "on_route",
+        is_on_bus: student.is_on_bus,
         driver_name: van?.driver_name || "Assigning...",
         driver_phone: van?.driver_phone || null,
         // Safeguard: Ensure handover_token is present for the QR code
@@ -110,14 +110,12 @@ async function logHandoverEvent({ studentId, driverId, action, method, lat, lng 
 
 async function getChildAttendanceHistory(student_id) {
   const { data, error } = await supabase
-    .from("attendance")
-    .select("*")
+    .from("pickup_logs") // 🟢 Change from "attendance" to "pickup_logs"
+    .select("id, type, timestamp, van_id, location_name")
     .eq("student_id", student_id)
     .order("timestamp", { ascending: false });
 
   if (error) throw new Error(error.message);
-
-  // Optional: Group by date on the backend to make frontend's life easier
   return data;
 }
 
