@@ -85,6 +85,8 @@ async function verifyStudentHandover(req, res) {
   const { studentId } = req.params;
   const { pin, method, action, lat, lng, scannedToken } = req.body;
 
+  console.log(`🚀 [Handover] Starting ${action} for Student: ${studentId}`);
+
   try {
     const { data: student, error: fetchError } = await supabase
       .from("students")
@@ -93,32 +95,32 @@ async function verifyStudentHandover(req, res) {
       .single();
 
     if (fetchError || !student) {
+      console.error("❌ [Handover] Student not found:", studentId);
       return res.status(404).json({ success: false, message: "Student not found" });
     }
 
-    // --- STANDALONE LOGIC START ---
-    
+    // --- VERIFICATION LOGIC ---
     if (method === "QR_SCAN") {
-      // If QR matches, we skip the PIN check entirely
       if (student.handover_token === scannedToken) {
-        console.log(`✅ QR Match for ${student.name}`);
+        console.log(`✅ [Handover] QR Match for ${student.name}`);
       } else {
+        console.warn(`⚠️ [Handover] QR Mismatch for ${student.name}`);
         return res.status(403).json({ success: false, message: "Invalid QR Code" });
       }
     } else {
-      // If MANUAL_PIN, we check the PIN
       const dbPin = String(student.guardian_pin).trim();
       const inputPin = String(pin || "").trim();
       if (dbPin !== inputPin) {
+        console.warn(`⚠️ [Handover] PIN Incorrect for ${student.name}`);
         return res.status(401).json({ success: false, message: "Incorrect Security PIN" });
       }
-      console.log(`✅ PIN Match for ${student.name}`);
+      console.log(`✅ [Handover] PIN Match for ${student.name}`);
     }
-
-    // --- STANDALONE LOGIC END ---
 
     // 4️⃣ Update student status
     const isPickup = action === "picked_up";
+    console.log(`db status to update: ${isPickup ? "picked_up" : "dropped_off"}`);
+    
     const { error: updateError } = await supabase
       .from("students")
       .update({
@@ -128,24 +130,42 @@ async function verifyStudentHandover(req, res) {
       })
       .eq("id", studentId);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("❌ [Handover] Student Table Update Error:", updateError.message);
+      throw updateError;
+    }
 
-    // 5️⃣ Audit Log
-    await supabase.from("pickup_logs").insert({
-      student_id: studentId,
-      driver_id: req.user.id, // Ensure this is coming from your auth middleware
-      van_id: student.assigned_van_id,
-      school_id: student.school_id,
-      verification_hash: method,
-      latitude: lat || null,
-      longitude: lng || null,
-      action_type: isPickup ? "pickup" : "dropoff",
-      scanned_at: new Date().toISOString()
-    });
+    // 5️⃣ Audit Log (Fixing column names + adding error capture)
+    console.log("📝 [Handover] Attempting to write to pickup_logs...");
+    
+    const { data: logData, error: logError } = await supabase
+      .from("pickup_logs")
+      .insert({
+        student_id: studentId,
+        driver_id: req.user?.id, // 🛡️ req.user.id depends on auth middleware
+        van_id: student.assigned_van_id,
+        school_id: student.school_id,
+        verification_hash: method,
+        location_lat: lat || null, // 🟢 Corrected name
+        location_lng: lng || null, // 🟢 Corrected name
+        action_type: isPickup ? "pickup" : "dropoff",
+        scanned_at: new Date().toISOString()
+      })
+      .select();
+
+    if (logError) {
+      console.error("💥 [Handover] Pickup Logs INSERT Error:", logError.message);
+      console.error("💥 [Handover] Details:", logError);
+      // We don't throw here so the driver still gets a success for the student status, 
+      // but we will see the error in the Render logs.
+    } else {
+      console.log("✅ [Handover] Pickup Log saved successfully:", logData[0].id);
+    }
 
     res.status(200).json({ success: true, message: "Verification successful" });
 
   } catch (err) {
+    console.error("🔥 [Handover] Critical System Error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 }
