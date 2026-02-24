@@ -111,7 +111,7 @@ async function logHandoverEvent({ studentId, driverId, action, method, lat, lng 
 async function getChildAttendanceHistory(student_id) {
   const { data, error } = await supabase
     .from("pickup_logs") // 🟢 Change from "attendance" to "pickup_logs"
-    .select("id, type, timestamp, van_id, location_name")
+    .select("id, action_type, timestamp, van_id, location_name")
     .eq("student_id", student_id)
     .order("timestamp", { ascending: false });
 
