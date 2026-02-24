@@ -14,39 +14,51 @@ const ResetPin = () => {
 
   // Step 1: Send OTP to Phone
   const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await axios.post("/api/auth/forgot-pin", { phone_number: phone });
-      setStep(2);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "User not found. Check the number.");
-      // For demo: setStep(2);
-    } finally {
-      setLoading(false);
-    }
-  };
+  e.preventDefault();
+  setError("");
+  setLoading(true);
+  try {
+    // We send 'reason: reset' so the backend knows to bypass the "already has a PIN" check
+    await axios.post("/api/auth/forgot-pin", { 
+      phone_number: phone,
+      reason: "reset" 
+    });
+    setStep(2);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (err: any) {
+    setError(err.response?.data?.message || "User not found. Check the number.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Step 2: Verify OTP and Set New PIN
   const handleResetPin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await axios.post("/api/auth/reset-pin", { 
-        phone_number: phone, 
-        otp, 
-        new_pin: newPin 
-      });
-      setStep(3); // Success state
-      setTimeout(() => navigate("/login"), 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid OTP. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  e.preventDefault();
+  setError("");
+  setLoading(true);
+  try {
+    // 1. Verify the code
+    await axios.post("/api/auth/reset-pin", { 
+      phone_number: phone, 
+      otp: otp 
+    });
+
+    // 2. Immediately set the new PIN
+    await axios.post("/api/auth/set-pin", { 
+      phone_number: phone, 
+      pin: newPin 
+    });
+
+    setStep(3);
+    setTimeout(() => navigate("/login"), 3000);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (err: any) {
+    setError(err.response?.data?.message || "Verification failed. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center p-6 font-sans">

@@ -47,7 +47,7 @@ router.put("/notifications/read", authenticate(), markNotificationsRead);
 
 // Example: if a route is only for SCHOOL_ADMIN
 router.get("/school/stats", authenticate(["SCHOOL_ADMIN"]), getProfile);
-router.post("/start-otp", startOtpLogin);
-router.post("/verify-otp", verifyOtp);
-router.post("/set-pin", setPin);
+router.post("/forgot-pin", startOtpLogin); // frontend calls forgot-pin
+router.post("/reset-pin", verifyOtp);      // frontend calls reset-pin
+router.post("/set-pin", setPin);           // frontend calls set-pin
 module.exports = router;

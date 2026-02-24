@@ -289,8 +289,9 @@ const startOtpLogin = async (req, res) => {
       .select("*")
       .eq("phone_number", normalizedPhone)
       .maybeSingle();
-
-    const user = parent || driver;
+    
+      const { data: school } = await supabase.from("schools").select("*").eq("admin_email", rawPhone).maybeSingle();
+    const user = parent || driver || school;
 
     if (!user) {
       console.log("❌ No user found in Database for:", normalizedPhone);
