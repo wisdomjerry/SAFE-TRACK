@@ -56,8 +56,19 @@ async function createDriverService(driver) {
   return data;
 }
 
+
 // --- GET DRIVER DASHBOARD ---
 async function getDriverDashboardService(driver_id, school_id) {
+  // 1. Fetch School Name
+  const { data: school, error: schoolError } = await supabase
+    .from("schools")
+    .select("name")
+    .eq("id", school_id)
+    .single();
+
+  if (schoolError) console.error("School fetch error:", schoolError.message);
+
+  // 2. Fetch Van
   const { data: van, error: vanError } = await supabase
     .from("vans")
     .select("*")
@@ -68,12 +79,13 @@ async function getDriverDashboardService(driver_id, school_id) {
 
   if (!van) {
     return {
+      school_name: school?.name || "SafeTrack Academy", // Return school even if no van
       van: { model: "No Van Assigned", plate_number: "N/A" },
       students: [],
     };
   }
 
-  // FIXED: Included handover_token and photo_url
+  // 3. Fetch Students
   const { data: students, error: studentError } = await supabase
     .from("students")
     .select("id, name, home_address, is_on_bus, status, parent_phone, handover_token")
@@ -81,7 +93,12 @@ async function getDriverDashboardService(driver_id, school_id) {
 
   if (studentError) throw new Error("Error fetching students: " + studentError.message);
 
-  return { van, students: students || [] };
+  // 🟢 Success: Return everything including school_name
+  return { 
+    school_name: school?.name || "SafeTrack Academy",
+    van, 
+    students: students || [] 
+  };
 }
 
 // --- GET DRIVER ROUTE ---

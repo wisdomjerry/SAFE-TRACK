@@ -20,6 +20,7 @@ import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
+import { ShieldCheck } from "lucide-react";
 
 const DriverDashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -37,6 +38,7 @@ const DriverDashboard = () => {
   const [, setScannedToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [schoolName, setSchoolName] = useState<string>("");
 
   useGpsBroadcaster(van?.id, tripActive);
 
@@ -57,6 +59,7 @@ const DriverDashboard = () => {
       if (response.data.success) {
         setVan(response.data.van);
         setStudents(response.data.students);
+        setSchoolName(response.data.school_name || "SafeTrack Academy");
         setDriverInfo((prev: any) => ({
           ...prev,
           phone_number: response.data.van?.driver_phone || prev.phone_number,
@@ -246,13 +249,40 @@ const DriverDashboard = () => {
     <div
       className={`min-h-screen ${theme.bg} ${theme.textMain} transition-colors duration-300 pb-24`}
     >
+      {/* PROFESSIONAL DRIVER HEADER */}
       <header className="px-6 pt-12 pb-4 flex justify-between items-center">
-        <h2 className="text-xl font-black tracking-tight uppercase italic">
-          SafeTrack <span className="text-blue-600">Pro</span>
-        </h2>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            {/* Brand Icon */}
+            <div className="bg-blue-600 p-1.5 rounded-lg shadow-lg shadow-blue-500/30">
+              <ShieldCheck size={18} className="text-white" />
+            </div>
+
+            <h2
+              className={`text-xl font-black tracking-tighter ${theme.textMain} flex items-center gap-2`}
+            >
+              SAFETRACK
+              <span className="bg-blue-600 text-[10px] text-white px-2 py-0.5 rounded-md tracking-widest font-black">
+                PRO
+              </span>
+            </h2>
+          </div>
+
+          {/* School Identity - Dynamically from state */}
+          <div className="flex items-center gap-1.5 ml-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+            <span
+              className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em]`}
+            >
+              {schoolName || "System Active"}
+            </span>
+          </div>
+        </div>
+
+        {/* Theme Toggle Button */}
         <button
           onClick={() => setIsDarkMode(!isDarkMode)}
-          className={`p-2 rounded-xl ${theme.card} border ${theme.border} shadow-sm`}
+          className={`p-2.5 rounded-2xl ${theme.card} border ${theme.border} shadow-xl active:scale-90 transition-all`}
         >
           {isDarkMode ? (
             <Sun size={20} className="text-amber-400" />
@@ -283,14 +313,34 @@ const DriverDashboard = () => {
                 />
               </div>
               <div>
-                <h3 className="font-black text-lg leading-tight">
+                <h3 className="font-black text-lg leading-tight text-blue-600">
                   {driverInfo?.full_name}
                 </h3>
-                <p
-                  className={`text-[10px] ${theme.textSub} font-bold uppercase tracking-widest`}
-                >
-                  {van?.plate_number} • Route {van?.id?.slice(0, 4)}
-                </p>
+
+                <div className="flex flex-col gap-0.5 mt-1">
+                  <p
+                    className={`text-[10px] ${theme.textSub} font-bold uppercase tracking-widest flex items-center gap-2`}
+                  >
+                    <span className="bg-blue-600/10 text-blue-600 px-1.5 py-0.5 rounded">
+                      {van?.plate_number}
+                    </span>
+                    <span>•</span>
+                    <span>Route {van?.id?.slice(0, 4)}</span>
+                  </p>
+
+                  {/* 🟢 DRIVER PHONE NUMBER SECTION */}
+                  {driverInfo?.phone_number && (
+                    <a
+                      href={`tel:${driverInfo.phone_number}`}
+                      className={`flex items-center gap-1.5 text-[11px] font-black mt-1 ${theme.textMain} hover:text-blue-600 transition-colors w-fit`}
+                    >
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                        <Phone size={10} className="text-emerald-600" />
+                      </div>
+                      {driverInfo.phone_number}
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
             <span

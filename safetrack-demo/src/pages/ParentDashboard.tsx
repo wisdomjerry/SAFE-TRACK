@@ -75,7 +75,7 @@ const ParentDashboard = () => {
   });
 
   const prevIsOnBusRef = useRef<boolean | null>(null);
-  const isUpdatingRef = useRef(false); // <--- ADD THIS LINE HERE
+  const isUpdatingRef = useRef(false);
   const activeChild = children.length > 0 ? children[0] : null;
 
   const theme = {
@@ -87,14 +87,11 @@ const ParentDashboard = () => {
     inner: isDarkMode ? "bg-white/5" : "bg-slate-50",
   };
 
-  // --- DATA LOADING ---
   const loadData = useCallback(async () => {
     try {
-      // 1. Fetch Student Status from Backend
       const res = await axios.get("/api/parents/children");
       const childrenData: Child[] = res.data.data || [];
 
-      // --- ANTI-FLICKER PROTECTION ---
       setChildren((prev) => {
         if (isUpdatingRef.current) {
           return childrenData.map((newChild) => {
@@ -115,7 +112,6 @@ const ParentDashboard = () => {
           prevIsOnBusRef.current = firstChild.is_on_bus;
         }
 
-        // 2. Fetch Route Path for the Map (Use Supabase to avoid 404)
         const { data: historyData } = await supabase
           .from("van_location_history")
           .select("lat, lng")
@@ -127,7 +123,6 @@ const ParentDashboard = () => {
           setRoutePath(historyData.map((h) => [h.lat, h.lng]));
         }
 
-        // 3. Fetch Logs from BACKEND API (Fixing the URL with backticks)
         const logsRes = await axios.get(
           `/api/parents/history/${firstChild.id}`,
         );
@@ -146,7 +141,6 @@ const ParentDashboard = () => {
     loadData();
   }, [loadData]);
 
-  // --- PIN ROTATION ---
   const autoRotatePin = async (studentId: string) => {
     const newPin = Math.floor(100000 + Math.random() * 900000).toString();
     try {
@@ -159,7 +153,6 @@ const ParentDashboard = () => {
     }
   };
 
-  // --- UPDATE HOME LOCATION ---
   const updateHomeLocation = () => {
     if (!activeChild) return;
     navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -181,7 +174,6 @@ const ParentDashboard = () => {
     });
   };
 
-  // --- GEOFENCE MONITOR ---
   useEffect(() => {
     if (!activeChild || hasNotifiedProximity || !activeChild.is_on_bus) return;
 
@@ -210,11 +202,9 @@ const ParentDashboard = () => {
     activeChild,
   ]);
 
-  // --- REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
     if (children.length === 0) return;
 
-    // 1. VAN TRACKING
     const vanChannel = supabase
       .channel("live-van-tracking")
       .on(
@@ -241,8 +231,6 @@ const ParentDashboard = () => {
       )
       .subscribe();
 
-    // 2. STUDENT STATUS (BOARDING/PIN)
-    // 2. STUDENT STATUS (BOARDING/PIN)
     const studentChannel = supabase
       .channel("student-status-monitor")
       .on(
@@ -251,13 +239,6 @@ const ParentDashboard = () => {
         (payload) => {
           const updatedFields = payload.new as Child;
 
-          console.log("🔔 REALTIME UPDATE RECEIVED:", {
-            studentId: updatedFields.id,
-            isOnBus: updatedFields.is_on_bus,
-            currentRef: prevIsOnBusRef.current,
-          });
-
-          // Detect Change
           const hasBoarded =
             prevIsOnBusRef.current === false &&
             updatedFields.is_on_bus === true;
@@ -265,15 +246,8 @@ const ParentDashboard = () => {
             prevIsOnBusRef.current === true &&
             updatedFields.is_on_bus === false;
 
-          // Inside your student-status-monitor channel...
           if (hasBoarded || hasDropped) {
-            console.log(
-              `🚀 TRANSITION DETECTED: ${hasBoarded ? "BOARDING" : "DROPPING"}`,
-            );
-
-            // 1. 🛡️ TURN ON THE SHIELD
             isUpdatingRef.current = true;
-
             prevIsOnBusRef.current = updatedFields.is_on_bus;
             setShowToast({
               show: true,
@@ -289,33 +263,18 @@ const ParentDashboard = () => {
               setHasNotifiedProximity(false);
             }
 
-            // 2. 🔄 WAIT FOR BACKEND TO SETTLE
-            console.log(
-              "⏳ Waiting 3 seconds before refreshing logs to prevent flicker...",
-            );
             setTimeout(async () => {
-              console.log("🔄 Triggering loadData refresh...");
               await loadData();
-
-              // 3. 🔓 RELEASE THE SHIELD AFTER LOAD IS DONE
-              // We wait an extra second here to be absolutely safe
               setTimeout(() => {
                 isUpdatingRef.current = false;
-                console.log("🔓 Shield down. UI and API are now synced.");
               }, 1000);
             }, 3000);
           }
 
-          // IMMEDIATE STATE UPDATE
           setChildren((current) => {
-            const nextState = current.map((c) =>
+            return current.map((c) =>
               c.id === updatedFields.id ? { ...c, ...updatedFields } : c,
             );
-            console.log(
-              "🎨 UI STATE UPDATED TO:",
-              nextState[0]?.is_on_bus ? "ON BOARD" : "WAITING",
-            );
-            return nextState;
           });
 
           if (updatedFields.guardian_pin) {
@@ -344,7 +303,6 @@ const ParentDashboard = () => {
     <div
       className={`${theme.bg} min-h-screen pb-32 transition-colors duration-300`}
     >
-      {/* TOAST NOTIFICATION */}
       {showToast.show && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-100 w-[90%] max-w-md">
           <div className="bg-emerald-600 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3 animate-bounce">
@@ -354,7 +312,6 @@ const ParentDashboard = () => {
         </div>
       )}
 
-      {/* HEADER */}
       <header
         className={`${theme.card} backdrop-blur-md sticky top-0 z-40 px-6 pt-10 pb-6 flex justify-between items-start border-b ${theme.border}`}
       >
@@ -392,36 +349,42 @@ const ParentDashboard = () => {
       </header>
 
       <div className="px-5 mt-6 space-y-8">
-        {/* QR & PIN SECTION */}
-        <section
-          className={`${theme.card} rounded-[2.5rem] p-8 shadow-xl border ${theme.border} text-center`}
-        >
-          <p
-            className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em] mb-6`}
+        {/* AUTOMATED HANDOVER SECTION - TRIGGERED ONLY BY "waiting" STATUS */}
+        {activeChild.status === "waiting" && (
+          <section
+            className={`${theme.card} rounded-[2.5rem] p-8 shadow-2xl border-2 border-blue-600/20 text-center animate-in slide-in-from-bottom-10 duration-700`}
           >
-            {activeChild.is_on_bus
-              ? "Drop-off Token (Active)"
-              : "Pickup Token (Pending)"}
-          </p>
-          <div className="inline-block p-4 bg-white rounded-3xl mb-6 shadow-sm">
-            <QRCodeSVG
-              value={activeChild.handover_token || activeChild.id}
-              size={160}
-              level="H"
-              includeMargin={true}
-            />
-          </div>
-          <div className="flex gap-2 justify-center">
-            {guardianPin.split("").map((char, i) => (
-              <div
-                key={i}
-                className={`w-10 h-14 ${theme.inner} rounded-xl flex items-center justify-center text-2xl font-black ${theme.textMain} border ${theme.border}`}
-              >
-                {char}
-              </div>
-            ))}
-          </div>
-        </section>
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <div className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+              <p className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em]`}>
+                {activeChild.is_on_bus ? "Driver Ready: Drop-off Scan" : "Driver Ready: Pickup Scan"}
+              </p>
+            </div>
+
+            <div className="inline-block p-4 bg-white rounded-3xl mb-6 shadow-sm ring-8 ring-blue-500/5">
+              <QRCodeSVG
+                value={activeChild.handover_token || activeChild.id}
+                size={180}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-center mb-4">
+              {guardianPin.split("").map((char, i) => (
+                <div
+                  key={i}
+                  className={`w-10 h-14 ${theme.inner} rounded-xl flex items-center justify-center text-2xl font-black ${theme.textMain} border-2 ${theme.border} shadow-sm`}
+                >
+                  {char}
+                </div>
+              ))}
+            </div>
+            <p className={`text-[10px] ${theme.textSub} font-bold italic`}>
+              Present this to the driver for verification
+            </p>
+          </section>
+        )}
 
         {/* LIVE MAP SECTION */}
         <section>
@@ -430,12 +393,20 @@ const ParentDashboard = () => {
               Live Tracking
             </h3>
             <span
-              className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full ${activeChild.is_on_bus ? "text-emerald-600 bg-emerald-500/10" : "text-amber-600 bg-amber-500/10"}`}
+              className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full ${
+                activeChild.status === "picked_up" 
+                  ? "text-emerald-600 bg-emerald-500/10" 
+                  : activeChild.status === "waiting"
+                  ? "text-blue-600 bg-blue-500/10"
+                  : "text-amber-600 bg-amber-500/10"
+              }`}
             >
               <div
-                className={`w-1.5 h-1.5 rounded-full ${activeChild.is_on_bus ? "bg-emerald-500 animate-ping" : "bg-amber-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  activeChild.status === "picked_up" ? "bg-emerald-500 animate-ping" : "bg-amber-500"
+                }`}
               />
-              {activeChild.is_on_bus ? "ON BOARD" : "WAITING"}
+              {activeChild.status.replace("_", " ").toUpperCase()}
             </span>
           </div>
           <div
@@ -453,7 +424,7 @@ const ParentDashboard = () => {
             <button
               onClick={() =>
                 window.open(
-                  `https://www.google.com/maps?q=${activeChild.lat},${activeChild.lng}`,
+                  `https://www.google.com/maps/search/?api=1&query=${activeChild.lat},${activeChild.lng}`,
                   "_blank",
                 )
               }

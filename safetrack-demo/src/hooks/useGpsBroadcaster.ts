@@ -28,8 +28,7 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
     const updateLocation = async (position: GeolocationPosition) => {
       const { latitude, longitude, speed, heading } = position.coords;
 
-      // IMPORTANT: We update the 'vans' table EVERY time the phone moves,
-      // even by 1 meter. This ensures the "Live" map is always perfect.
+      // 1. Prepare base data
       const updateData: any = {
         current_lat: latitude,
         current_lng: longitude,
@@ -38,43 +37,51 @@ export const useGpsBroadcaster = (vanId: string, isActive: boolean) => {
         last_updated: new Date().toISOString(),
       };
 
-      // We only do the expensive Address lookup (Reverse Geocoding)
-      // if they have moved significantly (approx 50m)
       const isFirstRun = lastCoords.current.lat === 0;
       const hasMovedSignificant =
         Math.abs(latitude - lastCoords.current.lat) > 0.0005 ||
         Math.abs(longitude - lastCoords.current.lng) > 0.0005;
 
+      // 2. Handle Address Update (Don't 'await' it here to keep the map fast)
       if (isFirstRun || hasMovedSignificant) {
-        const currentAddress = await getAddress(latitude, longitude);
-        if (currentAddress) {
-          updateData.current_location_name = currentAddress;
-        }
         lastCoords.current = { lat: latitude, lng: longitude };
+
+        getAddress(latitude, longitude).then((currentAddress) => {
+          if (currentAddress) {
+            // Update ONLY the address column once we have it
+            supabase
+              .from("vans")
+              .update({ current_location_name: currentAddress })
+              .eq("id", vanId);
+          }
+        });
       }
 
-      // Sync to Supabase - This is what moves the marker on the map
+      // 3. Sync Position to Supabase IMMEDIATELY
       await supabase.from("vans").update(updateData).eq("id", vanId);
 
-      // History inserts (breadcrumbs) should still stay strict to save DB space
-      if (isFirstRun || Math.abs(latitude - lastCoords.current.lat) > 0.0001) {
-        await supabase.from("van_location_history").insert([
-          {
-            van_id: vanId,
-            lat: latitude,
-            lng: longitude,
-          },
-        ]);
+      // 4. Breadcrumbs (History)
+      if (isFirstRun || hasMovedSignificant) {
+        await supabase
+          .from("van_location_history")
+          .insert([{ van_id: vanId, lat: latitude, lng: longitude }]);
       }
     };
 
     const watchId = navigator.geolocation.watchPosition(
       updateLocation,
-      (error) => console.error("GPS Watch Error:", error),
+      (error) => {
+        console.error("📍 GPS Watch Error:", error.message);
+
+        // If it's a timeout (code 3), it means the device is struggling with GPS signal
+        if (error.code === 3) {
+          console.warn("🔄 GPS Timeout. Retrying with longer window...");
+        }
+      },
       {
-        enableHighAccuracy: true,
-        maximumAge: 15000,
-        timeout: 0,
+        enableHighAccuracy: true, // Keep this for precise tracking
+        maximumAge: 5000, // Don't use a location older than 5 seconds
+        timeout: 15000, // 🟢 CHANGE: Give it 15 seconds to find a lock
       },
     );
     watchIdRef.current = watchId;
