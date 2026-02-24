@@ -146,8 +146,8 @@ async function verifyStudentHandover(req, res) {
         van_id: student.assigned_van_id,
         school_id: student.school_id,
         verification_hash: method,
-        location_lat: lat || null, // 🟢 Corrected name
-        location_lng: lng || null, // 🟢 Corrected name
+        latitude: lat || null,  // 🟢 Verified column name
+    longitude: lng || null,
         action_type: isPickup ? "pickup" : "dropoff",
         scanned_at: new Date().toISOString()
       })
