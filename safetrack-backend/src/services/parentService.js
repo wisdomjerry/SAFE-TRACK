@@ -24,7 +24,7 @@ async function createParentService(parent) {
   return data;
 }
 
-// Get all children of a parent (filtered by school_id)
+
 async function getChildrenByParentService(parent_id, school_id) {
   const { data, error } = await supabase
     .from("students")
@@ -38,9 +38,6 @@ async function getChildrenByParentService(parent_id, school_id) {
 
 async function getParentChildrenService(parent_id) {
   try {
-    console.log("🚀 [Service] Fetching children for Parent:", parent_id);
-
-    // 1. Get students
     const { data: students, error: studentError } = await supabase
       .from("students")
       .select("*")
@@ -49,19 +46,32 @@ async function getParentChildrenService(parent_id) {
     if (studentError) throw studentError;
     if (!students || students.length === 0) return [];
 
-    // 2. Get ONLY necessary data to avoid 500 errors on large tables
+   
     const [{ data: schools }, { data: vans }] = await Promise.all([
       supabase.from("schools").select("id, name"),
       supabase
         .from("vans")
-        .select(
-          "id, plate_number, driver_name, driver_phone, current_lat, current_lng, current_speed, status",
-        ),
+        .select(`
+          id, 
+          plate_number, 
+          current_lat, 
+          current_lng, 
+          current_speed, 
+          status,
+          drivers (
+            full_name,
+            phone_number,
+            avatar_url
+          )
+        `),
     ]);
 
     return students.map((student) => {
       const van = vans?.find((v) => v.id === student.assigned_van_id);
       const school = schools?.find((s) => s.id === student.school_id);
+      
+      
+      const driverData = van?.drivers?.[0];
 
       return {
         ...student,
@@ -72,18 +82,20 @@ async function getParentChildrenService(parent_id) {
         lng: van?.current_lng || 0,
         current_speed: van?.current_speed || 0,
         is_on_bus: student.is_on_bus,
-        driver_name: van?.driver_name || "Assigning...",
-        driver_phone: van?.driver_phone || null,
-        // Safeguard: Ensure handover_token is present for the QR code
+        
+        // NEW: Return a driver object for the frontend to use
+        driver: {
+          full_name: driverData?.full_name || van?.driver_name || "Assigning...",
+          phone_number: driverData?.phone_number || van?.driver_phone || null,
+          avatar_url: driverData?.avatar_url || null
+        },
+
         handover_token: student.handover_token || student.id
       };
     });
   } catch (error) {
-    console.error(
-      "❌ [Service] Critical Error in getParentChildrenService:",
-      error.message,
-    );
-    throw error; // This allows your controller to catch it and send a proper 500
+    console.error("❌ [Service] Error:", error.message);
+    throw error;
   }
 }
 

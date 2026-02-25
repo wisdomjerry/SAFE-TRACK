@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { Bell, User, LogOut, Settings } from "lucide-react";
 import { useUser } from "../hooks/useUser";
@@ -10,10 +11,10 @@ interface TopNavProps {
 }
 
 const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
-  const { userData, loading } = useUser();
+  // 1. userData should now contain avatar_url from your updated getProfile controller
+  const { userData, loading } = useUser() as any;
   const navigate = useNavigate();
 
-  // State for toggles
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -39,22 +40,24 @@ const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
   const { title, userTitle } = roleConfig[role];
   const userName = loading ? "Loading..." : userData?.name || "User";
 
+  // 2. Prioritize the real avatar, fallback to UI Avatars
+  const profileImg =
+    userData?.avatar_url ||
+    `https://ui-avatars.com/api/?name=${userName.replace(" ", "+")}&background=3b82f6&color=fff&bold=true`;
+
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userRole");
+    localStorage.clear(); // Clear all to be safe
     navigate("/login");
   };
 
   return (
     <nav className="h-16 bg-white border-b border-gray-100 px-4 md:px-8 flex items-center justify-between shrink-0 relative z-100">
-      {/* Dynamic Page Title */}
       <div className="flex items-center">
         <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
           {title}
         </h1>
       </div>
 
-      {/* Actions & Profile Section */}
       <div className="flex items-center gap-1 md:gap-3">
         {/* NOTIFICATIONS BELL */}
         <div className="relative">
@@ -69,7 +72,6 @@ const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
             <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></span>
           </button>
 
-          {/* Notifications Dropdown */}
           {showNotifications && (
             <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2">
               <div className="p-4 border-b border-slate-50 flex justify-between items-center">
@@ -87,14 +89,6 @@ const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
                     Test Academy requested approval.
                   </p>
                 </div>
-                <div className="p-4 hover:bg-slate-50 cursor-pointer transition-colors">
-                  <p className="text-xs font-bold text-slate-800">
-                    System Update
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    V2.4 Maintenance completed.
-                  </p>
-                </div>
               </div>
             </div>
           )}
@@ -102,7 +96,7 @@ const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
 
         <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block" />
 
-        {/* PROFILE DROPDOWN */}
+        {/* PROFILE SECTION */}
         <div className="relative">
           <div
             onClick={() => {
@@ -121,16 +115,20 @@ const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
             </div>
 
             <div className="relative">
+              {/* UPDATED: Added object-cover to handle real images properly */}
               <img
-                src={`https://ui-avatars.com/api/?name=${userName.replace(" ", "+")}&background=3b82f6&color=fff&bold=true`}
-                alt="User"
-                className={`w-10 h-10 rounded-full border-2 transition-all ${showProfileMenu ? "border-blue-500 shadow-md" : "border-white shadow-sm"}`}
+                src={profileImg}
+                alt="User Profile"
+                className={`w-10 h-10 rounded-full border-2 object-cover transition-all ${
+                  showProfileMenu
+                    ? "border-blue-500 shadow-md scale-105"
+                    : "border-white shadow-sm"
+                }`}
               />
               <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
             </div>
           </div>
 
-          {/* Profile Dropdown Menu */}
           {showProfileMenu && (
             <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 animate-in fade-in slide-in-from-top-2">
               <div className="px-4 py-2 border-b border-slate-50 md:hidden">
@@ -139,8 +137,6 @@ const TopNav: React.FC<TopNavProps> = ({ role }: { role: UserRole }) => {
                   {userTitle}
                 </p>
               </div>
-
-              {/* Inside TopNav.tsx Dropdown */}
 
               <Link
                 to={`${basePath}/profile`}

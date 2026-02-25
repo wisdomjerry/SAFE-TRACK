@@ -169,6 +169,7 @@ const getProfile = async (req, res) => {
         name: data.full_name || data.school_name || data.name,
         role: role,
         school_id: data.school_id || data.id,
+        avatar: data.avatar_url || null,
         // We explicitly pass this so the Sidebar can see it
         google_sheet_url: data.google_sheet_url || null,
         details: data,

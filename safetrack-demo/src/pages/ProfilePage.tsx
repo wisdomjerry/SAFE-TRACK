@@ -110,23 +110,38 @@ const ProfilePage = () => {
     formData.append("upload_preset", "safetrack_unsigned");
 
     try {
+      // 1. Upload to Cloudinary (This part works!)
       const res = await fetch(
         `https://api.cloudinary.com/v1_1/dnxnr4ocz/image/upload`,
-        {
-          method: "POST",
-          body: formData,
-        },
+        { method: "POST", body: formData },
       );
       const data = await res.json();
 
       if (data.secure_url) {
+        // 2. Map the role to the correct table
+        const tableMap: Record<Role, string> = {
+          SUPER_ADMIN: "profiles",
+          SCHOOL_ADMIN: "schools",
+          DRIVER: "drivers",
+          PARENT: "parents",
+        };
+
+        const targetTable = tableMap[userData.role];
+
+        // 3. Update the CORRECT table
         const { error } = await supabase
-          .from("profiles")
+          .from(targetTable) // Use the dynamic table name
           .update({ avatar_url: data.secure_url })
           .eq("id", userData.id);
 
         if (error) throw error;
+
+        // 4. Update local state so it shows immediately
         setLocalAvatar(data.secure_url);
+
+        // Optional: Update localStorage so the Navbar sees it immediately without a refresh
+        localStorage.setItem("userAvatar", data.secure_url);
+
         alert("Success! Profile picture updated.");
       }
     } catch (err) {

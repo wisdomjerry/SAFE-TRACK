@@ -33,6 +33,13 @@ interface Child {
   driver_phone?: string;
   home_lat?: number;
   home_lng?: number;
+  driver?: DriverInfo;
+}
+
+interface DriverInfo {
+  full_name: string;
+  phone_number: string;
+  avatar_url?: string;
 }
 
 interface LogEntry {
@@ -324,9 +331,54 @@ const ParentDashboard = () => {
               SafeTrack
             </span>
           </div>
-          <h1 className={`text-2xl font-black ${theme.textMain} leading-tight`}>
+
+          <h1
+            className={`text-2xl font-black ${theme.textMain} leading-tight mb-4`}
+          >
             {activeChild.full_name}
           </h1>
+
+          {/* NEW: Driver Quick Info Bar */}
+          {activeChild.driver && (
+            <div
+              className={`flex items-center justify-between p-3 rounded-2xl ${isDarkMode ? "bg-white/5 border-white/10" : "bg-blue-50/50 border-blue-100"} border mt-2 animate-in fade-in slide-in-from-left-4`}
+            >
+              <div className="flex items-center gap-3">
+                {/* Driver Avatar */}
+                <div className="relative">
+                  <img
+                    src={
+                      activeChild.driver.avatar_url ||
+                      `https://ui-avatars.com/api/?name=${activeChild.driver.full_name.replace(" ", "+")}&background=3b82f6&color=fff`
+                    }
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                    alt="Driver"
+                  />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
+                </div>
+
+                {/* Name and Role */}
+                <div>
+                  <p
+                    className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-slate-400" : "text-blue-600/70"}`}
+                  >
+                    Assigned Driver
+                  </p>
+                  <p className={`text-sm font-bold ${theme.textMain}`}>
+                    {activeChild.driver.full_name}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action: Phone Dialer */}
+              <a
+                href={`tel:${activeChild.driver.phone_number}`}
+                className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full hover:bg-blue-700 active:scale-90 transition-all shadow-lg shadow-blue-200"
+              >
+                <Phone size={18} fill="currentColor" />
+              </a>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button
@@ -356,8 +408,12 @@ const ParentDashboard = () => {
           >
             <div className="flex items-center justify-center gap-2 mb-6">
               <div className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
-              <p className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em]`}>
-                {activeChild.is_on_bus ? "Driver Ready: Drop-off Scan" : "Driver Ready: Pickup Scan"}
+              <p
+                className={`text-[10px] font-black ${theme.textSub} uppercase tracking-[0.2em]`}
+              >
+                {activeChild.is_on_bus
+                  ? "Driver Ready: Drop-off Scan"
+                  : "Driver Ready: Pickup Scan"}
               </p>
             </div>
 
@@ -394,16 +450,18 @@ const ParentDashboard = () => {
             </h3>
             <span
               className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full ${
-                activeChild.status === "picked_up" 
-                  ? "text-emerald-600 bg-emerald-500/10" 
+                activeChild.status === "picked_up"
+                  ? "text-emerald-600 bg-emerald-500/10"
                   : activeChild.status === "waiting"
-                  ? "text-blue-600 bg-blue-500/10"
-                  : "text-amber-600 bg-amber-500/10"
+                    ? "text-blue-600 bg-blue-500/10"
+                    : "text-amber-600 bg-amber-500/10"
               }`}
             >
               <div
                 className={`w-1.5 h-1.5 rounded-full ${
-                  activeChild.status === "picked_up" ? "bg-emerald-500 animate-ping" : "bg-amber-500"
+                  activeChild.status === "picked_up"
+                    ? "bg-emerald-500 animate-ping"
+                    : "bg-amber-500"
                 }`}
               />
               {activeChild.status.replace("_", " ").toUpperCase()}

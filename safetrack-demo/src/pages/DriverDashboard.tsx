@@ -302,14 +302,18 @@ const DriverDashboard = () => {
               <div className="relative">
                 <img
                   src={
-                    driverInfo?.photo_url ||
-                    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"
+                    driverInfo?.avatar_url || // Updated to use avatar_url
+                    `https://ui-avatars.com/api/?name=${(driverInfo?.full_name || "Driver").replace(" ", "+")}&background=3b82f6&color=fff&bold=true`
                   }
-                  className="w-14 h-14 rounded-2xl object-cover border-2 border-blue-600/20"
-                  alt="Driver"
+                  className="w-14 h-14 rounded-2xl object-cover border-2 border-blue-600/20 transition-all hover:scale-105"
+                  alt={driverInfo?.full_name || "Driver"}
                 />
                 <div
-                  className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 ${isDarkMode ? "border-[#1C1C1E]" : "border-white"} rounded-full ${tripActive ? "bg-emerald-500 animate-pulse" : "bg-slate-500"}`}
+                  className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 ${
+                    isDarkMode ? "border-[#1C1C1E]" : "border-white"
+                  } rounded-full ${
+                    tripActive ? "bg-emerald-500 animate-pulse" : "bg-slate-500"
+                  }`}
                 />
               </div>
               <div>
