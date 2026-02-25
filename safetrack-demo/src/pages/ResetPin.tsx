@@ -19,7 +19,7 @@ const ResetPin = () => {
   setLoading(true);
   try {
     // We send 'reason: reset' so the backend knows to bypass the "already has a PIN" check
-    await api.post("/api/auth/forgot-pin", { 
+    await api.post("https://safe-track-8a62.onrender.com/api/auth/forgot-pin", { 
       phone_number: phone,
       reason: "reset" 
     });
@@ -39,13 +39,13 @@ const ResetPin = () => {
   setLoading(true);
   try {
     // 1. Verify the code
-    await api.post("/api/auth/reset-pin", { 
+    await api.post("https://safe-track-8a62.onrender.com/api/auth/reset-pin", { 
       phone_number: phone, 
       otp: otp 
     });
 
     // 2. Immediately set the new PIN
-    await api.post("/api/auth/set-pin", { 
+    await api.post("https://safe-track-8a62.onrender.com/api/auth/set-pin", { 
       phone_number: phone, 
       pin: newPin 
     });
