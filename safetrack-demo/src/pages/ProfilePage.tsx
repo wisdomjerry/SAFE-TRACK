@@ -143,6 +143,7 @@ const ProfilePage = () => {
         localStorage.setItem("userAvatar", data.secure_url);
 
         alert("Success! Profile picture updated.");
+        window.location.reload();
       }
     } catch (err) {
       console.error(err);
