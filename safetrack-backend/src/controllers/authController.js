@@ -267,7 +267,7 @@ const normalizePhone = (phone) => {
 };
 
 const startOtpLogin = async (req, res) => {
-  const { phone, phone_number } = req.body;
+  const { phone, phone_number, reason } = req.body; // Added 'reason' here
   const rawPhone = phone || phone_number;
 
   if (!rawPhone) {
@@ -290,7 +290,12 @@ const startOtpLogin = async (req, res) => {
       .eq("phone_number", normalizedPhone)
       .maybeSingle();
     
-      const { data: school } = await supabase.from("schools").select("*").eq("admin_email", rawPhone).maybeSingle();
+    const { data: school } = await supabase
+      .from("schools")
+      .select("*")
+      .eq("admin_email", rawPhone)
+      .maybeSingle();
+
     const user = parent || driver || school;
 
     if (!user) {
@@ -301,20 +306,19 @@ const startOtpLogin = async (req, res) => {
     }
 
     console.log("👤 User Found:", user.full_name || user.name);
-    console.log("🔒 DB PIN Value:", user.pin ? "EXISTS" : "MISSING");
-    console.log("📊 User Status:", user.status);
-
-    // 1. UPDATED CHECK: If they have a PIN, they are ready to log in.
-    // We removed user.status because the column doesn't exist in your DB.
-    if (user.pin && user.pin.length > 0) {
-      console.log(`✅ User ${normalizedPhone} has a PIN. Skipping OTP.`);
+    
+    // --- UPDATED LOGIC ---
+    // If they have a PIN, and the reason is NOT "reset", send them to login
+    if (user.pin && user.pin.length > 0 && reason !== "reset") {
+      console.log(`✅ User ${normalizedPhone} has a PIN. Skipping OTP for standard login.`);
       return res.json({
         success: true,
         step: "ENTER_PIN",
       });
     }
 
-    console.log("➡️ Directing to OTP Activation");
+    // If reason is "reset", we IGNORE the existing PIN and send a new OTP
+    console.log("➡️ Directing to OTP Activation/Reset");
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     await supabase.from("otps").insert([
@@ -326,9 +330,12 @@ const startOtpLogin = async (req, res) => {
       },
     ]);
 
+    // Return dev_otp so the frontend toaster can catch it
     return res.json({
+      success: true,
+      message: "OTP generated",
       step: "VERIFY_OTP",
-      dev_otp: otp,
+      dev_otp: otp, 
     });
   } catch (error) {
     console.error("💥 Start Login Error:", error.message);
