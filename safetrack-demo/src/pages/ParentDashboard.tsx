@@ -381,17 +381,7 @@ const ParentDashboard = () => {
             >
               SafeTrack
             </span>
-
-            {/* NEW: School Name Display */}
-          <p
-            className={`text-sm font-bold opacity-70 ${theme.textMain} mt-1 flex items-center gap-1`}
-          >
-            <School size={14} className="text-blue-500" />
-            {activeChild.school_name}
-          </p>
           </div>
-
-          
 
           <div>
             <input
@@ -422,14 +412,13 @@ const ParentDashboard = () => {
               </div>
 
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <ShieldCheck size={16} className="text-blue-600" />
-                  <span
-                    className={`text-xs font-bold ${theme.textMain} tracking-tight`}
-                  >
-                    SafeTrack
-                  </span>
-                </div>
+                {/* NEW: School Name Display */}
+                <p
+                  className={`text-sm font-bold opacity-70 ${theme.textMain} mt-1 flex items-center gap-1`}
+                >
+                  <School size={14} className="text-blue-500" />
+                  {activeChild.school_name}
+                </p>
                 <h1
                   className={`text-2xl font-black ${theme.textMain} leading-tight`}
                 >
