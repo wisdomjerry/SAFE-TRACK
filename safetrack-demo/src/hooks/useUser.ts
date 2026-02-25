@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios'; // Your custom axios instance
 
 export const useUser = () => {
-  const [userData, setUserData] = useState<{ name: string; role: string; email: string; } | null>(null);
+ const [userData, setUserData] = useState<{ 
+    id: string; // Add ID so the Profile Page knows who to update
+    name: string; 
+    role: string; 
+    email: string; 
+    avatar_url?: string; 
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

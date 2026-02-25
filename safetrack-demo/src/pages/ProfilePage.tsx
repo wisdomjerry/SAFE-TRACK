@@ -228,8 +228,9 @@ const ProfilePage = () => {
               )}
               <img
                 src={
-                  localAvatar ||
-                  userData?.avatar_url ||
+                  localAvatar || // 1. Immediate upload feedback
+                  userData?.avatar_url || // 2. Fresh data from Hook/Backend
+                  localStorage.getItem("userAvatar") || // 3. Backup for refreshes
                   `https://ui-avatars.com/api/?name=${userData?.name}&background=0f172a&color=fff`
                 }
                 className="w-full h-full object-cover"

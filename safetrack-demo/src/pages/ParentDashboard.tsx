@@ -381,15 +381,17 @@ const ParentDashboard = () => {
             >
               SafeTrack
             </span>
-          </div>
 
-          {/* NEW: School Name Display */}
+            {/* NEW: School Name Display */}
           <p
             className={`text-sm font-bold opacity-70 ${theme.textMain} mt-1 flex items-center gap-1`}
           >
             <School size={14} className="text-blue-500" />
             {activeChild.school_name}
           </p>
+          </div>
+
+          
 
           <div>
             <input
