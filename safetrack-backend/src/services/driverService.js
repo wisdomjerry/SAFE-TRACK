@@ -88,7 +88,7 @@ async function getDriverDashboardService(driver_id, school_id) {
   // 3. Fetch Students
   const { data: students, error: studentError } = await supabase
     .from("students")
-    .select("id, name, home_address, is_on_bus, status, parent_phone, handover_token")
+    .select("id, name, home_address, is_on_bus, avatar_url, status, parent_phone, handover_token")
     .eq("assigned_van_id", van.id);
 
   if (studentError) throw new Error("Error fetching students: " + studentError.message);
@@ -114,7 +114,7 @@ async function getDriverRouteService(driver_id) {
   // FIXED: Included handover_token and photo_url here too
   const { data: students, error } = await supabase
     .from("students")
-    .select("id, name, parent_phone, is_on_bus, home_address, status, handover_token")
+    .select("id, name, parent_phone, is_on_bus, avatar_url, home_address, status, handover_token")
     .eq("assigned_van_id", driverData.assigned_van_id);
 
   if (error) throw new Error(error.message);

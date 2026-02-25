@@ -600,7 +600,7 @@ const DriverDashboard = () => {
               <div className="relative">
                 <img
                   src={
-                    selectedStudent?.photo_url ||
+                    selectedStudent?.avatar_url ||
                     "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"
                   }
                   className="w-24 h-24 rounded-full object-cover border-4 border-emerald-500 shadow-xl"
@@ -638,7 +638,7 @@ const StudentItem = ({
   name,
   phone,
   status,
-  img,
+  img: avatarUrl,
   theme,
   color,
   isDone,
@@ -651,11 +651,11 @@ const StudentItem = ({
       <div className={`p-1 rounded-full border-2 ${color} bg-slate-500/10`}>
         <img
           src={
-            img ||
-            "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"
+            avatarUrl ||
+            `https://ui-avatars.com/api/?name=${name.replace(" ", "+")}`
           }
-          className="w-12 h-12 rounded-full object-cover"
-          alt={name}
+          className="w-12 h-12 rounded-xl object-cover"
+          alt="Student"
         />
       </div>
       <div>

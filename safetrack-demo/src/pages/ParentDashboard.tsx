@@ -7,9 +7,11 @@ import {
   Phone,
   CheckCircle2,
   ShieldCheck,
+  School,
   Sun,
   Moon,
   Navigation,
+  Camera,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -34,6 +36,7 @@ interface Child {
   home_lat?: number;
   home_lng?: number;
   driver?: DriverInfo;
+  avatar_url?: string;
 }
 
 interface DriverInfo {
@@ -147,6 +150,54 @@ const ParentDashboard = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 1. Add this at the top of your Parent Dashboard component
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+
+  const handleAvatarClick = () => fileInputRef.current?.click();
+
+  const handleStudentAvatarChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeChild?.id) return;
+
+    setIsUpdatingAvatar(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "safetrack_unsigned");
+
+    try {
+      // 1. Upload to Cloudinary
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/dnxnr4ocz/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+      const data = await res.json();
+
+      if (data.secure_url) {
+        // 2. Update students table in Supabase
+        const { error } = await supabase
+          .from("students")
+          .update({ avatar_url: data.secure_url })
+          .eq("id", activeChild.id);
+
+        if (error) throw error;
+
+        alert("Student photo updated!");
+        window.location.reload(); // Refresh to show new image
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Failed to update student photo.");
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
 
   const autoRotatePin = async (studentId: string) => {
     const newPin = Math.floor(100000 + Math.random() * 900000).toString();
@@ -332,11 +383,59 @@ const ParentDashboard = () => {
             </span>
           </div>
 
-          <h1
-            className={`text-2xl font-black ${theme.textMain} leading-tight mb-4`}
+          {/* NEW: School Name Display */}
+          <p
+            className={`text-sm font-bold opacity-70 ${theme.textMain} mt-1 flex items-center gap-1`}
           >
-            {activeChild.full_name}
-          </h1>
+            <School size={14} className="text-blue-500" />
+            {activeChild.school_name}
+          </p>
+
+          <div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleStudentAvatarChange}
+              accept="image/*"
+            />
+
+            <div className="flex items-center gap-4 mb-4">
+              {/* Student Avatar Display */}
+              <div
+                className="relative cursor-pointer group"
+                onClick={handleAvatarClick}
+              >
+                <img
+                  src={
+                    activeChild.avatar_url ||
+                    `https://ui-avatars.com/api/?name=${activeChild.full_name.replace(" ", "+")}&background=0f172a&color=fff`
+                  }
+                  className={`w-16 h-16 rounded-2xl object-cover border-2 ${isUpdatingAvatar ? "opacity-50" : "opacity-100"}`}
+                  alt="Student"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/20 rounded-2xl transition-opacity">
+                  <Camera size={20} className="text-white" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldCheck size={16} className="text-blue-600" />
+                  <span
+                    className={`text-xs font-bold ${theme.textMain} tracking-tight`}
+                  >
+                    SafeTrack
+                  </span>
+                </div>
+                <h1
+                  className={`text-2xl font-black ${theme.textMain} leading-tight`}
+                >
+                  {activeChild.full_name}
+                </h1>
+              </div>
+            </div>
+          </div>
 
           {/* NEW: Driver Quick Info Bar */}
           {activeChild.driver && (

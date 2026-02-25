@@ -94,6 +94,7 @@ async function getParentChildrenService(parent_id) {
       return {
         ...student,
         full_name: student.name,
+        avatar_url: student.avatar_url || null,
         school_name: school?.name || "Unknown School",
         van_id: van?.id || null,
         lat: van?.current_lat || 0,
