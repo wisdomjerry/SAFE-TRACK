@@ -38,15 +38,21 @@ async function getChildrenByParentService(parent_id, school_id) {
 
 async function getParentChildrenService(parent_id) {
   try {
+    console.log("🚀 [FETCH START] parent_id:", parent_id);
+
+    // 1. Get students
     const { data: students, error: studentError } = await supabase
       .from("students")
       .select("*")
       .eq("parent_id", parent_id);
 
-    if (studentError) throw studentError;
-    if (!students || students.length === 0) return [];
+    if (studentError) {
+      console.error("❌ [STUDENT ERROR]:", studentError);
+      throw studentError;
+    }
+    console.log(`👶 [STUDENTS FOUND]: ${students?.length || 0}`);
 
-   
+    // 2. Parallel Fetch
     const [{ data: schools }, { data: vans }] = await Promise.all([
       supabase.from("schools").select("id, name"),
       supabase
@@ -58,20 +64,32 @@ async function getParentChildrenService(parent_id) {
           current_lng, 
           current_speed, 
           status,
+          driver_name,
+          driver_phone,
           drivers:driver_id (
-      full_name,
-      phone_number,
-      avatar_url
-    )
+            full_name,
+            phone_number,
+            avatar_url
+          )
         `),
     ]);
 
-    return students.map((student) => {
+    // 🔍 THIS IS THE MOST IMPORTANT LOG
+    console.log("🚐 [RAW VANS DATA]:", JSON.stringify(vans, null, 2));
+
+    const result = students.map((student) => {
       const van = vans?.find((v) => v.id === student.assigned_van_id);
       const school = schools?.find((s) => s.id === student.school_id);
       
-      
+      // Note: If you used 'drivers:driver_id' in the select above, 
+      // the key in the object will be 'drivers'
       const driverData = van?.drivers?.[0];
+
+      console.log(`-----------------------------------`);
+      console.log(`🎯 Mapping Student: ${student.name}`);
+      console.log(`🔗 Assigned Van ID: ${student.assigned_van_id}`);
+      console.log(`🔎 Van Found:`, van ? "YES" : "NO");
+      console.log(`👨‍✈️ Driver Data Found:`, driverData ? "YES" : "NO");
 
       return {
         ...student,
@@ -83,7 +101,6 @@ async function getParentChildrenService(parent_id) {
         current_speed: van?.current_speed || 0,
         is_on_bus: student.is_on_bus,
         
-        // NEW: Return a driver object for the frontend to use
         driver: {
           full_name: driverData?.full_name || van?.driver_name || "Assigning...",
           phone_number: driverData?.phone_number || van?.driver_phone || null,
@@ -93,8 +110,12 @@ async function getParentChildrenService(parent_id) {
         handover_token: student.handover_token || student.id
       };
     });
+
+    console.log("✅ [FETCH COMPLETE] Returning mapped data.");
+    return result;
+
   } catch (error) {
-    console.error("❌ [Service] Error:", error.message);
+    console.error("❌ [SERVICE CRITICAL ERROR]:", error.message);
     throw error;
   }
 }
