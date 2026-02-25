@@ -59,7 +59,7 @@ const Login = () => {
 
     try {
       const res = await axios.post(
-        "https://safe-track-8a62.onrender.com/api/auth/start-otp",
+        "https://safe-track-8a62.onrender.com/api/auth/forgot-pin",
         { phone_number: identifier },
       );
 
