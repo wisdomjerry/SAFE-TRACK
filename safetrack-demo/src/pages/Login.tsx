@@ -74,7 +74,7 @@ const Login = () => {
         setIsFirstTime(true);
         setOtpSent(true);
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.response?.data?.message || "User not found");
       toast.error("Account lookup failed"); // Feedback for mobile users
@@ -121,7 +121,7 @@ const Login = () => {
 
         navigate(routeMap[role] || "/");
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.response?.data?.message || "Invalid Credentials");
       toast.error("Check your PIN and try again");
@@ -251,11 +251,11 @@ const Login = () => {
               <input
                 ref={pinInputRef}
                 type={showPin ? "text" : "password"}
-                placeholder={isFirstTime ? "Choose 4-Digit PIN" : "4-Digit PIN"}
+                placeholder={isFirstTime ? "Choose 6-Digit PIN" : "6-Digit PIN"} // Updated text
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 inputMode="numeric"
-                maxLength={identifier.includes("@") ? 20 : 4}
+                maxLength={identifier.includes("@") ? 20 : 6} // Changed from 4 to 6
                 className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-[16px] focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white focus:border-blue-500 transition-all tracking-[0.5em] font-black"
                 required
               />
@@ -279,7 +279,7 @@ const Login = () => {
 
             <button
               type="submit"
-              disabled={loading || pin.length < 4}
+              disabled={loading || (!identifier.includes("@") && pin.length < 6)}
               className="w-full bg-[#0f172a] text-white font-black text-sm uppercase tracking-widest py-4 rounded-2xl hover:bg-black transition-all shadow-lg shadow-gray-200 mt-2 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? (
