@@ -58,11 +58,11 @@ async function getParentChildrenService(parent_id) {
           current_lng, 
           current_speed, 
           status,
-          drivers (
-            full_name,
-            phone_number,
-            avatar_url
-          )
+          drivers:driver_id (
+      full_name,
+      phone_number,
+      avatar_url
+    )
         `),
     ]);
 
