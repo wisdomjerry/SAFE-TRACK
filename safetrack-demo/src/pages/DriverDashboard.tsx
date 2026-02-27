@@ -16,11 +16,15 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { useGpsBroadcaster } from "../hooks/useGpsBroadcaster";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+// Using Mapbox instead of Leaflet
+import Map, { Marker as MapboxMarker } from "react-map-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 import { ShieldCheck } from "lucide-react";
+
+// Replace with your actual Mapbox Public Token
+const MAPBOX_TOKEN =
+  "pk.eyJ1Ijoid2lzZG9tMjU2IiwiYSI6ImNtbTM1c28wdTBkeGIycXIyNTlxczRjMnMifQ.L8TXS4xTe9ZvdNqjQk9SVA";
 
 const DriverDashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -63,6 +67,10 @@ const DriverDashboard = () => {
         setDriverInfo((prev: any) => ({
           ...prev,
           phone_number: response.data.van?.driver_phone || prev.phone_number,
+          avatar_url:
+            response.data.van?.driver_avatar ||
+            response.data.driver_avatar ||
+            null,
         }));
       }
     } catch (error) {
@@ -215,27 +223,6 @@ const DriverDashboard = () => {
     accent: "bg-blue-600",
   };
 
-  const vanIcon = L.divIcon({
-    className: "custom-icon",
-    html: `<div class="relative flex items-center justify-center">
-          <div class="absolute w-12 h-12 bg-blue-500 rounded-full animate-ping opacity-40"></div>
-          <div class="absolute w-8 h-8 bg-blue-400 rounded-full animate-pulse opacity-20"></div>
-          <div class="relative bg-blue-600 p-2.5 rounded-full border-4 border-white shadow-2xl text-white">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          </div>
-        </div>`,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-  });
-
-  function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
-    const map = useMap();
-    useEffect(() => {
-      map.setView([lat, lng], 17);
-    }, [lat, lng, map]);
-    return null;
-  }
-
   if (loading)
     return (
       <div
@@ -249,15 +236,12 @@ const DriverDashboard = () => {
     <div
       className={`min-h-screen ${theme.bg} ${theme.textMain} transition-colors duration-300 pb-24`}
     >
-      {/* PROFESSIONAL DRIVER HEADER */}
       <header className="px-6 pt-12 pb-4 flex justify-between items-center">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            {/* Brand Icon */}
             <div className="bg-blue-600 p-1.5 rounded-lg shadow-lg shadow-blue-500/30">
               <ShieldCheck size={18} className="text-white" />
             </div>
-
             <h2
               className={`text-xl font-black tracking-tighter ${theme.textMain} flex items-center gap-2`}
             >
@@ -267,8 +251,6 @@ const DriverDashboard = () => {
               </span>
             </h2>
           </div>
-
-          {/* School Identity - Dynamically from state */}
           <div className="flex items-center gap-1.5 ml-1">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
             <span
@@ -279,7 +261,6 @@ const DriverDashboard = () => {
           </div>
         </div>
 
-        {/* Theme Toggle Button */}
         <button
           onClick={() => setIsDarkMode(!isDarkMode)}
           className={`p-2.5 rounded-2xl ${theme.card} border ${theme.border} shadow-xl active:scale-90 transition-all`}
@@ -302,25 +283,20 @@ const DriverDashboard = () => {
               <div className="relative">
                 <img
                   src={
-                    driverInfo?.avatar_url || // Updated to use avatar_url
+                    driverInfo?.avatar_url ||
                     `https://ui-avatars.com/api/?name=${(driverInfo?.full_name || "Driver").replace(" ", "+")}&background=3b82f6&color=fff&bold=true`
                   }
                   className="w-14 h-14 rounded-2xl object-cover border-2 border-blue-600/20 transition-all hover:scale-105"
                   alt={driverInfo?.full_name || "Driver"}
                 />
                 <div
-                  className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 ${
-                    isDarkMode ? "border-[#1C1C1E]" : "border-white"
-                  } rounded-full ${
-                    tripActive ? "bg-emerald-500 animate-pulse" : "bg-slate-500"
-                  }`}
+                  className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 ${isDarkMode ? "border-[#1C1C1E]" : "border-white"} rounded-full ${tripActive ? "bg-emerald-500 animate-pulse" : "bg-slate-500"}`}
                 />
               </div>
               <div>
                 <h3 className="font-black text-lg leading-tight text-blue-600">
                   {driverInfo?.full_name}
                 </h3>
-
                 <div className="flex flex-col gap-0.5 mt-1">
                   <p
                     className={`text-[10px] ${theme.textSub} font-bold uppercase tracking-widest flex items-center gap-2`}
@@ -331,8 +307,6 @@ const DriverDashboard = () => {
                     <span>•</span>
                     <span>Route {van?.id?.slice(0, 4)}</span>
                   </p>
-
-                  {/* 🟢 DRIVER PHONE NUMBER SECTION */}
                   {driverInfo?.phone_number && (
                     <a
                       href={`tel:${driverInfo.phone_number}`}
@@ -374,37 +348,51 @@ const DriverDashboard = () => {
           </div>
         </section>
 
-        {/* Live Map UI Fixed */}
+        {/* Updated Mapbox Section */}
         <section
           className={`${theme.card} rounded-[2.8rem] p-2 border ${theme.border} overflow-hidden shadow-2xl relative`}
         >
-          <div className="absolute top-6 left-6 z-1000 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
+          <div className="absolute top-6 left-6 z-10 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-[10px] font-black text-white uppercase tracking-widest">
               Live GPS
             </span>
           </div>
 
-          <button className="absolute bottom-6 right-6 z-1000 bg-blue-600 p-3 rounded-2xl text-white shadow-xl active:scale-90 transition-transform">
-            <Navigation size={20} />
-          </button>
-
           <div className="relative h-80 w-full rounded-[2.4rem] bg-slate-900 overflow-hidden border border-white/5">
             {van?.current_lat ? (
-              <MapContainer
-                key={van.id}
-                center={[van.current_lat, van.current_lng]}
-                zoom={17}
-                zoomControl={false}
-                style={{ height: "100%", width: "100%", zIndex: 1 }}
+              <Map
+                initialViewState={{
+                  latitude: van.current_lat,
+                  longitude: van.current_lng,
+                  zoom: 16,
+                  pitch: 45,
+                }}
+                // This viewState prop ensures the map follows the van updates
+                viewState={{
+                  latitude: van.current_lat,
+                  longitude: van.current_lng,
+                  zoom: 16,
+                  pitch: 45,
+                  bearing: 0,
+                }}
+                mapStyle="mapbox://styles/mapbox/navigation-night-v1"
+                mapboxAccessToken={MAPBOX_TOKEN}
               >
-                <TileLayer url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}" />
-                <Marker
-                  position={[van.current_lat, van.current_lng]}
-                  icon={vanIcon}
-                />
-                <RecenterMap lat={van.current_lat} lng={van.current_lng} />
-              </MapContainer>
+                <MapboxMarker
+                  latitude={van.current_lat}
+                  longitude={van.current_lng}
+                  anchor="center"
+                >
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute w-12 h-12 bg-blue-500 rounded-full animate-ping opacity-40"></div>
+                    <div className="absolute w-8 h-8 bg-blue-400 rounded-full animate-pulse opacity-20"></div>
+                    <div className="relative bg-blue-600 p-2.5 rounded-full border-4 border-white shadow-2xl text-white">
+                      <Navigation size={20} fill="currentColor" />
+                    </div>
+                  </div>
+                </MapboxMarker>
+              </Map>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
                 <Loader2
@@ -493,7 +481,7 @@ const DriverDashboard = () => {
                 name={student.name}
                 phone={student.parent_phone}
                 status={student.status.replace("_", " ")}
-                img={student.photo_url}
+                img={student.avatar_url}
                 theme={theme}
                 color={
                   student.status === "picked_up"
@@ -508,7 +496,7 @@ const DriverDashboard = () => {
         </section>
       </div>
 
-      {/* Verification Modal */}
+      {/* Verification Modals and Success screen remain unchanged below */}
       {(showVerifyModal || isScanning) && (
         <div
           className={`fixed inset-0 z-10001 flex items-end ${isScanning ? "bg-transparent" : "bg-black/60 backdrop-blur-sm"} animate-in fade-in duration-300`}
@@ -590,18 +578,16 @@ const DriverDashboard = () => {
         </div>
       )}
 
-      {/* SUCCESS SCREEN WITH STUDENT DATA */}
       {showSuccess && (
         <div className="fixed inset-0 z-20000 flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-500 px-6">
           <div className="bg-white rounded-[3.5rem] w-full max-w-sm p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] transform animate-in zoom-in-95 duration-300 text-center">
-            {/* Pulsing Avatar Area */}
             <div className="relative flex justify-center mb-8">
               <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping scale-150" />
               <div className="relative">
                 <img
                   src={
                     selectedStudent?.avatar_url ||
-                    "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"
+                    "https://ui-avatars.com/api/?name=Student"
                   }
                   className="w-24 h-24 rounded-full object-cover border-4 border-emerald-500 shadow-xl"
                   alt="Verified"
@@ -611,7 +597,6 @@ const DriverDashboard = () => {
                 </div>
               </div>
             </div>
-
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-1 uppercase italic">
               Verified
             </h2>
@@ -621,12 +606,6 @@ const DriverDashboard = () => {
             <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] bg-slate-100 py-2 px-4 rounded-full inline-block">
               Status Updated Successfully
             </p>
-
-            <div className="mt-10 pt-8 border-t border-slate-100">
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-tighter animate-pulse">
-                Syncing with Cloud...
-              </p>
-            </div>
           </div>
         </div>
       )}
@@ -638,7 +617,7 @@ const StudentItem = ({
   name,
   phone,
   status,
-  img: avatarUrl,
+  img: avatar_url,
   theme,
   color,
   isDone,
@@ -651,7 +630,7 @@ const StudentItem = ({
       <div className={`p-1 rounded-full border-2 ${color} bg-slate-500/10`}>
         <img
           src={
-            avatarUrl ||
+            avatar_url ||
             `https://ui-avatars.com/api/?name=${name.replace(" ", "+")}`
           }
           className="w-12 h-12 rounded-xl object-cover"
