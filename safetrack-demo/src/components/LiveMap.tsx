@@ -11,7 +11,6 @@ const LiveMap = ({
   isOnBus,
   heading,
   routePath,
-  isDarkMode = false,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }: any) => {
   const mapRef = useRef<MapRef>(null);
@@ -40,6 +39,18 @@ const LiveMap = ({
     }
   }, [nLat, nLng, mapLoaded]);
 
+  useEffect(() => {
+  if (mapRef.current) {
+    const map = mapRef.current.getMap();
+    map.setLight({
+      anchor: "viewport",
+      color: "white",
+      intensity: 0.4,
+      position: [1.1, 90, 30], // [distance, azimuth, polar]
+    });
+  }
+}, [mapLoaded]);
+
   // Convert routePath for Mapbox GeoJSON (Mapbox uses [lng, lat])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routeData: any = useMemo(
@@ -65,7 +76,7 @@ const LiveMap = ({
           zoom: 15,
           pitch: 45, // Gives that premium 3D look
         }}
-        mapStyle="mapbox://styles/mapbox/navigation-night-v1"
+        mapbox://styles/mapbox/dark-v11
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: "100%", height: "100%" }}
       >
@@ -118,37 +129,25 @@ const LiveMap = ({
 
         {/* 3. Optional 3D Buildings */}
         {mapLoaded && (
-          <Layer
-            id="3d-buildings"
-            source="composite"
-            source-layer="building"
-            filter={["==", "extrude", "true"]}
-            type="fill-extrusion"
-            minzoom={14} // Force them to show up earlier
-            paint={{
-              "fill-extrusion-color": isDarkMode ? "#334155" : "#cbd5e1", // Adjust based on your theme
-              "fill-extrusion-height": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                14,
-                0,
-                14.05,
-                ["get", "height"],
-              ],
-              "fill-extrusion-base": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                14,
-                0,
-                14.05,
-                ["get", "min_height"],
-              ],
-              "fill-extrusion-opacity": 0.6,
-            }}
-          />
-        )}
+  <Layer
+    id="3d-buildings"
+    source="composite"
+    source-layer="building"
+    filter={["==", "extrude", "true"]}
+    type="fill-extrusion"
+    minzoom={13} 
+    paint={{
+      // High-contrast color for Dark Mode
+      "fill-extrusion-color": "#2e394d", 
+      
+      // Direct height fetch (no interpolation needed for basic 3D)
+      "fill-extrusion-height": ["get", "height"],
+      "fill-extrusion-base": ["get", "min_height"],
+      
+      "fill-extrusion-opacity": 0.8,
+    }}
+  />
+)}
       </Map>
 
       {/* 4. "Live" Status Badge */}
