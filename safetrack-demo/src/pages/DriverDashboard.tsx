@@ -367,18 +367,24 @@ const DriverDashboard = () => {
                   zoom: 16,
                   pitch: 45,
                 }}
+                fog={{
+                  range: [0.5, 10],
+                  color: "white",
+                  "high-color": "#add8e6",
+                  "space-color": "#d8f2ff",
+                }}
                 // This viewState prop ensures the map follows the van updates
                 viewState={
                   {
                     latitude: van.current_lat,
                     longitude: van.current_lng,
                     zoom: 16,
-                    pitch: 45,
-                    bearing: 0,
+                    pitch: 60,
+                    bearing: van.heading || 0,
                     padding: { top: 0, bottom: 0, left: 0, right: 0 },
                   } as any
                 } // Adding 'as any' tells TS you know what you're doing
-                mapStyle="mapbox://styles/mapbox/navigation-night-v1"
+                mapStyle="mapbox://styles/mapbox/navigation-day-v1"
                 mapboxAccessToken={MAPBOX_TOKEN}
               >
                 <MapboxMarker

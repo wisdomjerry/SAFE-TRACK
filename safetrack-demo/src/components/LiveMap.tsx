@@ -47,6 +47,8 @@ const LiveMap = ({
     if (mapRef.current && mapLoaded) {
       const map = mapRef.current.getMap();
 
+      if (!map.isStyleLoaded()) return;
+
       // Modern way to set lighting (v3.x+)
       map.setLights([
         {
@@ -80,7 +82,7 @@ const LiveMap = ({
     <div className="h-full w-full relative z-0 overflow-hidden rounded-[2.5rem] shadow-inner">
       <Map
         ref={mapRef}
-        onLoad={() => setMapLoaded(true)}
+        onStyleData={() => setMapLoaded(true)}
         initialViewState={{
           longitude: nLng,
           latitude: nLat,
