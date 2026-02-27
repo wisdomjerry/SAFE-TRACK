@@ -244,13 +244,42 @@ const ParentDashboard = () => {
       destLng,
     );
 
+    // Trigger when bus is within 500 meters (0.5 km)
     if (distance < 0.5) {
+      // 1. Play Sound
+      const audioCtx = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // Professional "Ding-Dong" chime frequency
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // High note
+      oscillator.frequency.exponentialRampToValueAtTime(
+        440,
+        audioCtx.currentTime + 0.5,
+      ); // Slide to low note
+
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.01,
+        audioCtx.currentTime + 0.5,
+      );
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.5);
+
+      // 2. Visual & Physical Alert
       setShowToast({
         show: true,
-        msg: "🚍 Van is nearly at the drop-off point!",
+        msg: "🚍 Safety Alert: The van is arriving at your location!",
       });
       setHasNotifiedProximity(true);
-      if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
+      if ("vibrate" in navigator) navigator.vibrate([100, 50, 100, 50, 300]);
     }
   }, [
     activeChild?.lat,
@@ -568,6 +597,7 @@ const ParentDashboard = () => {
                 isOnBus={activeChild.is_on_bus}
                 routePath={routePath}
                 heading={activeChild.heading}
+                activeChild={activeChild} // PASSING THE DATA TO THE MAP
               />
             </div>
             <button
@@ -577,7 +607,7 @@ const ParentDashboard = () => {
                   "_blank",
                 )
               }
-              className="absolute bottom-20 right-6 bg-white p-3 rounded-full shadow-lg text-blue-600 active:scale-90"
+              className="absolute bottom-24 right-6 bg-white p-3 rounded-full shadow-lg text-blue-600 active:scale-90 z-20"
             >
               <Navigation size={20} fill="currentColor" />
             </button>

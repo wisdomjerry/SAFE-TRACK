@@ -108,7 +108,7 @@ const LiveMap = ({
               className="relative transition-transform duration-500 ease-out z-10"
               style={{ transform: `rotate(${heading || 0}deg)` }}
             >
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-2.5 rounded-full shadow-2xl border-2 border-white">
+              <div className="bg-linear-to-br from-blue-600 to-indigo-700 p-2.5 rounded-full shadow-2xl border-2 border-white">
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/3448/3448339.png"
                   alt="bus"
