@@ -130,7 +130,7 @@ const ParentDashboard = () => {
           .limit(50);
 
         if (historyData) {
-          setRoutePath(historyData.map((h) => [h.lat, h.lng]));
+          setRoutePath(historyData.map((h) => [h.lng, h.lat]));
         }
 
         const logsRes = await axios.get(
