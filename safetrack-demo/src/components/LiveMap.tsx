@@ -3,8 +3,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef } from "react";
 
 // Replace with your actual Mapbox public token
-const MAPBOX_TOKEN =
-  "pk.eyJ1Ijoid2lzZG9tMjU2IiwiYSI6ImNtbTM1c28wdTBkeGIycXIyNTlxczRjMnMifQ.L8TXS4xTe9ZvdNqjQk9SVA";
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LiveMap = ({ lat, lng, isOnBus, heading, routePath }: any) => {

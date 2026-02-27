@@ -23,8 +23,7 @@ import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 import { ShieldCheck } from "lucide-react";
 
 // Replace with your actual Mapbox Public Token
-const MAPBOX_TOKEN =
-  "pk.eyJ1Ijoid2lzZG9tMjU2IiwiYSI6ImNtbTM1c28wdTBkeGIycXIyNTlxczRjMnMifQ.L8TXS4xTe9ZvdNqjQk9SVA";
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 const DriverDashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
