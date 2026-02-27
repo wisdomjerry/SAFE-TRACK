@@ -17,7 +17,7 @@ import {
 import axios from "axios";
 import { useGpsBroadcaster } from "../hooks/useGpsBroadcaster";
 // Using Mapbox instead of Leaflet
-import Map, { Marker as MapboxMarker } from "react-map-gl";
+import Map, { Marker as MapboxMarker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 import { ShieldCheck } from "lucide-react";
