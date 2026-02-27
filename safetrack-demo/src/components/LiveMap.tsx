@@ -91,17 +91,6 @@ const LiveMap = ({
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: "100%", height: "100%" }}
       >
-        {/* ONLY render layers if mapLoaded is true */}
-        {mapLoaded && (
-          <Layer
-            id="3d-buildings"
-            source="composite"
-            source-layer="building"
-            filter={["==", "extrude", "true"]}
-            type="fill-extrusion"
-            // ... paint props
-          />
-        )}
         {/* 1. The Route Path (Tail) */}
         {routePath && routePath.length > 1 && (
           <Source id="routePath" type="geojson" data={routeData}>
@@ -148,13 +137,9 @@ const LiveMap = ({
             type="fill-extrusion"
             minzoom={13}
             paint={{
-              // High-contrast color for Dark Mode
               "fill-extrusion-color": "#2e394d",
-
-              // Direct height fetch (no interpolation needed for basic 3D)
-              "fill-extrusion-height": ["get", "height"],
-              "fill-extrusion-base": ["get", "min_height"],
-
+              "fill-extrusion-height": ["coalesce", ["get", "height"], 15],
+              "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
               "fill-extrusion-opacity": 0.8,
             }}
           />
