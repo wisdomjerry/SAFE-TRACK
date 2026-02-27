@@ -87,7 +87,7 @@ const LiveMap = ({
           zoom: 15,
           pitch: 45, // Gives that premium 3D look
         }}
-        mapStyle="mapbox://styles/mapbox/dark-v11" // Fix 1: Add the style here
+        mapStyle="mapbox://styles/mapbox/standard"
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: "100%", height: "100%" }}
       >
