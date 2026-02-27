@@ -43,27 +43,6 @@ const LiveMap = ({
     }
   }, [nLat, nLng, mapLoaded]);
 
-  useEffect(() => {
-    if (mapRef.current && mapLoaded) {
-      const map = mapRef.current.getMap();
-
-      if (!map.isStyleLoaded()) return;
-
-      // Modern way to set lighting (v3.x+)
-      map.setLights([
-        {
-          id: "main-light",
-          type: "flat", // Standard for dark/navigation styles
-          properties: {
-            color: "rgba(255, 255, 255, 0.4)",
-            intensity: 0.5,
-            position: [1.1, 90, 30],
-          },
-        },
-      ]);
-    }
-  }, [mapLoaded]);
-
   // Convert routePath for Mapbox GeoJSON (Mapbox uses [lng, lat])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routeData: any = useMemo(
@@ -82,7 +61,25 @@ const LiveMap = ({
     <div className="h-full w-full relative z-0 overflow-hidden rounded-[2.5rem] shadow-inner">
       <Map
         ref={mapRef}
-        onStyleData={() => setMapLoaded(true)}
+        onLoad={(e) => {
+          const map = e.target;
+          // Wait for style to fully finish
+          map.once("style.load", () => {
+            map.setLights([
+              {
+                id: "main-light",
+                type: "flat",
+                properties: {
+                  color: "rgba(255, 255, 255, 0.4)",
+                  intensity: 0.5,
+                  position: [1.1, 90, 30],
+                },
+              },
+            ]);
+          });
+
+          setMapLoaded(true);
+        }}
         initialViewState={{
           longitude: nLng,
           latitude: nLat,
