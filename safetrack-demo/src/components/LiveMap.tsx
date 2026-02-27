@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // Replace with your actual Mapbox public token
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LiveMap = ({
   lat,
   lng,
@@ -13,6 +12,7 @@ const LiveMap = ({
   heading,
   routePath,
   isDarkMode = false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }: any) => {
   const mapRef = useRef<MapRef>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
