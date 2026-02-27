@@ -491,8 +491,9 @@ const ParentDashboard = () => {
       </header>
 
       <div className="px-5 mt-6 space-y-8">
-        {/* AUTOMATED HANDOVER SECTION - TRIGGERED ONLY BY "waiting" STATUS */}
-        {activeChild.status === "waiting" && (
+        {/* UPDATED HANDOVER LOGIC: Show for both Pickup AND Drop-off phases */}
+        {(activeChild.status === "waiting" ||
+          activeChild.status === "picked_up") && (
           <section
             className={`${theme.card} rounded-[2.5rem] p-8 shadow-2xl border-2 border-blue-600/20 text-center animate-in slide-in-from-bottom-10 duration-700`}
           >
