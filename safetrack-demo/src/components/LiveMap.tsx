@@ -40,14 +40,21 @@ const LiveMap = ({
   }, [nLat, nLng, mapLoaded]);
 
   useEffect(() => {
-  if (mapRef.current) {
+  if (mapRef.current && mapLoaded) {
     const map = mapRef.current.getMap();
-    map.setLight({
-      anchor: "viewport",
-      color: "white",
-      intensity: 0.4,
-      position: [1.1, 90, 30], // [distance, azimuth, polar]
-    });
+    
+    // Modern way to set lighting (v3.x+)
+    map.setLights([
+      {
+        id: "main-light",
+        type: "flat", // Standard for dark/navigation styles
+        properties: {
+          color: "rgba(255, 255, 255, 0.4)",
+          intensity: 0.5,
+          position: [1.1, 90, 30]
+        }
+      }
+    ]);
   }
 }, [mapLoaded]);
 
