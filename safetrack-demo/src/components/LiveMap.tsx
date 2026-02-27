@@ -6,7 +6,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const LiveMap = ({ lat, lng, isOnBus, heading, routePath }: any) => {
+const LiveMap = ({
+  lat,
+  lng,
+  isOnBus,
+  heading,
+  routePath,
+  isDarkMode = false,
+}: any) => {
   const mapRef = useRef<MapRef>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
@@ -110,19 +117,38 @@ const LiveMap = ({ lat, lng, isOnBus, heading, routePath }: any) => {
         </Marker>
 
         {/* 3. Optional 3D Buildings */}
-        <Layer
-          id="3d-buildings"
-          source="composite"
-          source-layer="building"
-          filter={["==", "extrude", "true"]}
-          type="fill-extrusion"
-          paint={{
-            "fill-extrusion-color": "#242b38",
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-base": ["get", "min_height"],
-            "fill-extrusion-opacity": 0.2,
-          }}
-        />
+        {mapLoaded && (
+          <Layer
+            id="3d-buildings"
+            source="composite"
+            source-layer="building"
+            filter={["==", "extrude", "true"]}
+            type="fill-extrusion"
+            minzoom={14} // Force them to show up earlier
+            paint={{
+              "fill-extrusion-color": isDarkMode ? "#334155" : "#cbd5e1", // Adjust based on your theme
+              "fill-extrusion-height": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                14,
+                0,
+                14.05,
+                ["get", "height"],
+              ],
+              "fill-extrusion-base": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                14,
+                0,
+                14.05,
+                ["get", "min_height"],
+              ],
+              "fill-extrusion-opacity": 0.6,
+            }}
+          />
+        )}
       </Map>
 
       {/* 4. "Live" Status Badge */}

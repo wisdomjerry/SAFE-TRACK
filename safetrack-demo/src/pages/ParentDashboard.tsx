@@ -594,7 +594,8 @@ const ParentDashboard = () => {
                     Current Location
                   </p>
                   <p className={`text-xs font-bold ${theme.textMain} truncate`}>
-                    {activeChild.current_location_name || "Detecting..."}
+                    {activeChild.current_location_name ||
+                      `${activeChild.lat.toFixed(4)}, ${activeChild.lng.toFixed(4)}`}
                   </p>
                 </div>
               </div>
