@@ -1,9 +1,13 @@
 import Map, { Marker, Source, Layer, type MapRef } from "react-map-gl/mapbox";
+import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 // Replace with your actual Mapbox public token
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+if (typeof window !== "undefined") {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+}
 
 const LiveMap = ({
   lat,
@@ -40,23 +44,23 @@ const LiveMap = ({
   }, [nLat, nLng, mapLoaded]);
 
   useEffect(() => {
-  if (mapRef.current && mapLoaded) {
-    const map = mapRef.current.getMap();
-    
-    // Modern way to set lighting (v3.x+)
-    map.setLights([
-      {
-        id: "main-light",
-        type: "flat", // Standard for dark/navigation styles
-        properties: {
-          color: "rgba(255, 255, 255, 0.4)",
-          intensity: 0.5,
-          position: [1.1, 90, 30]
-        }
-      }
-    ]);
-  }
-}, [mapLoaded]);
+    if (mapRef.current && mapLoaded) {
+      const map = mapRef.current.getMap();
+
+      // Modern way to set lighting (v3.x+)
+      map.setLights([
+        {
+          id: "main-light",
+          type: "flat", // Standard for dark/navigation styles
+          properties: {
+            color: "rgba(255, 255, 255, 0.4)",
+            intensity: 0.5,
+            position: [1.1, 90, 30],
+          },
+        },
+      ]);
+    }
+  }, [mapLoaded]);
 
   // Convert routePath for Mapbox GeoJSON (Mapbox uses [lng, lat])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,8 +87,9 @@ const LiveMap = ({
           zoom: 15,
           pitch: 45, // Gives that premium 3D look
         }}
-        mapbox://styles/mapbox/dark-v11
-        mapboxAccessToken={MAPBOX_TOKEN}
+        mapbox:mapboxAccessToken={ //styles/mapbox/dark-v11
+          MAPBOX_TOKEN
+        }
         style={{ width: "100%", height: "100%" }}
       >
         {/* ONLY render layers if mapLoaded is true */}
@@ -136,25 +141,25 @@ const LiveMap = ({
 
         {/* 3. Optional 3D Buildings */}
         {mapLoaded && (
-  <Layer
-    id="3d-buildings"
-    source="composite"
-    source-layer="building"
-    filter={["==", "extrude", "true"]}
-    type="fill-extrusion"
-    minzoom={13} 
-    paint={{
-      // High-contrast color for Dark Mode
-      "fill-extrusion-color": "#2e394d", 
-      
-      // Direct height fetch (no interpolation needed for basic 3D)
-      "fill-extrusion-height": ["get", "height"],
-      "fill-extrusion-base": ["get", "min_height"],
-      
-      "fill-extrusion-opacity": 0.8,
-    }}
-  />
-)}
+          <Layer
+            id="3d-buildings"
+            source="composite"
+            source-layer="building"
+            filter={["==", "extrude", "true"]}
+            type="fill-extrusion"
+            minzoom={13}
+            paint={{
+              // High-contrast color for Dark Mode
+              "fill-extrusion-color": "#2e394d",
+
+              // Direct height fetch (no interpolation needed for basic 3D)
+              "fill-extrusion-height": ["get", "height"],
+              "fill-extrusion-base": ["get", "min_height"],
+
+              "fill-extrusion-opacity": 0.8,
+            }}
+          />
+        )}
       </Map>
 
       {/* 4. "Live" Status Badge */}
