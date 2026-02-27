@@ -368,13 +368,16 @@ const DriverDashboard = () => {
                   pitch: 45,
                 }}
                 // This viewState prop ensures the map follows the van updates
-                viewState={{
-                  latitude: van.current_lat,
-                  longitude: van.current_lng,
-                  zoom: 16,
-                  pitch: 45,
-                  bearing: 0,
-                }}
+                viewState={
+                  {
+                    latitude: van.current_lat,
+                    longitude: van.current_lng,
+                    zoom: 16,
+                    pitch: 45,
+                    bearing: 0,
+                    padding: { top: 0, bottom: 0, left: 0, right: 0 },
+                  } as any
+                } // Adding 'as any' tells TS you know what you're doing
                 mapStyle="mapbox://styles/mapbox/navigation-night-v1"
                 mapboxAccessToken={MAPBOX_TOKEN}
               >
