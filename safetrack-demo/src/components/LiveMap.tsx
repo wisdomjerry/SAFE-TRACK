@@ -1,6 +1,6 @@
 import Map, { Marker, Source, Layer, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // Replace with your actual Mapbox public token
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
@@ -8,21 +8,30 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LiveMap = ({ lat, lng, isOnBus, heading, routePath }: any) => {
   const mapRef = useRef<MapRef>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Handle coordinate parsing
-  const nLat = parseFloat(lat) || 0.3476;
-  const nLng = parseFloat(lng) || 32.5825;
+  // At the top of your component
+  const nLat = useMemo(() => {
+    const val = parseFloat(lat);
+    return isFinite(val) ? val : 0.3476;
+  }, [lat]);
+
+  const nLng = useMemo(() => {
+    const val = parseFloat(lng);
+    return isFinite(val) ? val : 32.5825;
+  }, [lng]);
 
   // Smoothly follow the driver whenever the coordinates change
   useEffect(() => {
-    if (mapRef.current) {
+    if (mapRef.current && mapLoaded) {
+      // Only fly if loaded!
       mapRef.current.flyTo({
         center: [nLng, nLat],
-        duration: 2000, // 2 seconds of smooth gliding
+        duration: 2000,
         essential: true,
       });
     }
-  }, [nLat, nLng]);
+  }, [nLat, nLng, mapLoaded]);
 
   // Convert routePath for Mapbox GeoJSON (Mapbox uses [lng, lat])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,6 +51,7 @@ const LiveMap = ({ lat, lng, isOnBus, heading, routePath }: any) => {
     <div className="h-full w-full relative z-0 overflow-hidden rounded-[2.5rem] shadow-inner">
       <Map
         ref={mapRef}
+        onLoad={() => setMapLoaded(true)}
         initialViewState={{
           longitude: nLng,
           latitude: nLat,
@@ -52,6 +62,17 @@ const LiveMap = ({ lat, lng, isOnBus, heading, routePath }: any) => {
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: "100%", height: "100%" }}
       >
+        {/* ONLY render layers if mapLoaded is true */}
+        {mapLoaded && (
+          <Layer
+            id="3d-buildings"
+            source="composite"
+            source-layer="building"
+            filter={["==", "extrude", "true"]}
+            type="fill-extrusion"
+            // ... paint props
+          />
+        )}
         {/* 1. The Route Path (Tail) */}
         {routePath && routePath.length > 1 && (
           <Source id="routePath" type="geojson" data={routeData}>
