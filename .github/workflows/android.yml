@@ -28,6 +28,7 @@ jobs:
           cd safetrack-demo
           npm install --force
           sed -i "s/getDefaultProguardFile('proguard-android.txt')/getDefaultProguardFile('proguard-android-optimize.txt')/g" node_modules/@capacitor-mlkit/barcode-scanning/android/build.gradle
+          find node_modules -name "build.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
           npm run build
           npx cap sync android
 
