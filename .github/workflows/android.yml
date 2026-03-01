@@ -31,6 +31,8 @@ jobs:
           # This removes the dead jcenter repository link from all plugins
           find node_modules -name "build.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
           npm run build
+          # FORCE update the android web assets
+          npx cap copy android
           npx cap sync android
 
       - name: Setup Gradle
