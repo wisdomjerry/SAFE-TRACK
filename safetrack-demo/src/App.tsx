@@ -87,7 +87,6 @@ export default function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="permissions" element={<PermissionsPage />} />
           <Route path="settings" element={<SettingsPage />} />
-          {/* REMOVED LEADING SLASHES BELOW */}
           <Route path="accountsettings" element={<AccountSettingsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>

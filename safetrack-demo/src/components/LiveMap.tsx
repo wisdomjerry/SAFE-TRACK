@@ -1,4 +1,5 @@
-import Map, { Marker, Source, Layer, type MapRef } from "react-map-gl/mapbox";
+'use client'
+import Map, { Marker, Source, Layer } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef } from "react";
 
@@ -13,7 +14,7 @@ const LiveMap = ({
   routePath,
   activeChild, // NEW: Pass the student data here
 }: any) => {
-  const mapRef = useRef<MapRef>(null);
+  const myMapRef  = useRef<any>(null); // Using 'any' is a quick way to bypass strict errors on mobile
 
   const nLat = useMemo(() => {
     const val = parseFloat(lat);
@@ -26,8 +27,8 @@ const LiveMap = ({
   }, [lng]);
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    mapRef.current.flyTo({
+    if (!myMapRef.current) return;
+    myMapRef.current.flyTo({
       center: [nLng, nLat],
       bearing: heading || 0,
       pitch: 60,
@@ -50,7 +51,7 @@ const LiveMap = ({
   return (
     <div className="h-full w-full relative overflow-hidden rounded-[2.5rem] shadow-inner border-4 border-white/10">
       <Map
-        ref={mapRef}
+        ref={myMapRef}
         initialViewState={{
           longitude: nLng,
           latitude: nLat,
@@ -84,7 +85,7 @@ const LiveMap = ({
         />
 
         {routePath?.length > 1 && (
-          <Source id="route" type="geojson" data={routeData}>
+          <Source id="route" type="geojson" data={routeData as any}>
             <Layer
               id="route-line"
               type="line"
@@ -108,7 +109,7 @@ const LiveMap = ({
               className="relative transition-transform duration-500 ease-out z-10"
               style={{ transform: `rotate(${heading || 0}deg)` }}
             >
-              <div className="bg-linear-to-br from-blue-600 to-indigo-700 p-2.5 rounded-full shadow-2xl border-2 border-white">
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-2.5 rounded-full shadow-2xl border-2 border-white">
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/3448/3448339.png"
                   alt="bus"
