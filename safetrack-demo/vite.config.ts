@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
     resolve: {
         alias: {
-              // This bypasses the '.' specifier error by pointing directly to the ESM bundle
+              // This bypasses the '.' specifier error by pointing directly to the 
                     'react-map-gl': 'react-map-gl/dist/esm/index.js'
                         }
                           },
