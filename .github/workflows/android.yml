@@ -21,13 +21,14 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-    
 
-      - name: Install Dependencies and Sync Capacitor
+      - name: Install, Patch, and Build Web
         run: |
           cd safetrack-demo
           npm install --force
-          sed -i "s/getDefaultProguardFile('proguard-android.txt')/getDefaultProguardFile('proguard-android-optimize.txt')/g" node_modules/@capacitor-mlkit/barcode-scanning/android/build.gradle
+          # This universal patch fixes ProGuard errors for ALL plugins at once
+          find node_modules -name "build.gradle" -exec sed -i "s/getDefaultProguardFile('proguard-android.txt')/getDefaultProguardFile('proguard-android-optimize.txt')/g" {} +
+          # This removes the dead jcenter repository link from all plugins
           find node_modules -name "build.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
           npm run build
           npx cap sync android
