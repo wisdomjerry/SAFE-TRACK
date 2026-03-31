@@ -26,11 +26,12 @@ export default defineConfig([
       'tailwindcss/classnames-order': 'off',
       'tailwindcss/enforces-shorthand': 'off',
     },
-    build: {
-    commonjsOptions: {
-      include: [/node_modules/],
-      transformMixedEsModules: true, // This helps Recharts resolve its internal dependencies
-    },
   },
+  {
+    files: ['**/*.{css,scss}'],
+    extends: ['plugin:tailwindcss/recommended'],
+    rules: {
+      'tailwindcss/no-custom-classname': 'off',
+    },
   },
 ])
